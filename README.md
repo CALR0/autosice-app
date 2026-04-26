@@ -16,3 +16,7 @@ Flujo recomendado de despliegue
 3. Construir y desplegar el `frontend`.
 
 Todos los derechos reservados © 2026 Lizarazo.
+ 
+Despliegue público
+- Backend en producción: https://autosice-app.onrender.com
+- Frontend en producción: https://autosice.netlify.app/

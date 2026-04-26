@@ -45,3 +45,8 @@ API principal
   - `X-Rows-Processed`
   - `X-Rows-Errors`
   - `X-Processing-Status`
+
+  Despliegue
+  - Backend en producción: https://autosice-app.onrender.com
+
+  Es buena práctica documentar la URL pública en este README para pruebas y para indicar el entorno desplegado. No incluyas credenciales ni secretos en el repositorio.
