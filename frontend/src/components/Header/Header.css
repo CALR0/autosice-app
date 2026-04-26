@@ -1,0 +1,55 @@
+.site-header {
+  position: fixed;
+  top: 16px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none; /* allow underlying clicks except on links */
+  z-index: 40;
+  transition: opacity 280ms ease, transform 280ms ease;
+}
+
+.header-nav {
+  pointer-events: auto;
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  background: transparent;
+  padding: 8px 16px;
+  border-radius: 0;
+}
+
+.nav-link {
+  color: rgba(255,255,255,0.95);
+  text-decoration: none;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  padding: 8px 14px;
+  border-radius: 0;
+  transition: box-shadow 220ms ease, transform 220ms ease, color 220ms ease, opacity 220ms ease;
+  backdrop-filter: none;
+  will-change: opacity, transform;
+  opacity: 1;
+}
+
+.nav-link:hover {
+  background: transparent;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(2,6,23,0.45);
+  border-radius: 6px;
+}
+
+.nav-home { color: rgba(255,255,255,0.85); }
+.nav-home.active { color: #ff6aa3; }
+.nav-sicetac { color: #ffffff; }
+.nav-faq { color: rgba(255,255,255,0.9); }
+.nav-faq.active { color: #ff6aa3; }
+
+@media (max-width: 520px) {
+  .header-nav { gap: 12px; padding: 6px 10px; }
+  .nav-link { padding: 6px 10px; font-size: 13px; }
+}
+
+/* when scrolled, fade links */
+.site-header.scrolled .nav-link { opacity: 0; }

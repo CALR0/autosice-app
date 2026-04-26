@@ -1,0 +1,75 @@
+.example-section {
+  width: 100%;
+  max-width: 980px;
+  margin: 60px auto 55px; /* moved down and more bottom spacing */
+  padding: 0 12px;
+  text-align: center;
+}
+
+/* keep the description spacing and move the table lower */
+.example-section > .example-desc { margin-bottom: 60px; }
+.example-desc {
+  font-size: 16px;
+  color: var(--text);
+  max-width: 740px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.table-wrap { margin-top: 48px; }
+
+/* Card wrapper for the table */
+.table-card {
+  width: 100%;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.00));
+  box-shadow: 0 12px 34px rgba(2,6,23,0.36);
+  overflow: hidden;
+}
+
+.table-card .table-inner { overflow-x: auto; }
+
+.sample-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 720px;
+}
+
+.sample-table thead th {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--muted);
+  background: linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+}
+
+.sample-table tbody td {
+  padding: 12px 16px;
+  font-size: 14px;
+  color: var(--text);
+  vertical-align: middle;
+}
+
+.sample-table tbody tr:nth-child(odd) { background: rgba(255,255,255,0.012); }
+.sample-table tbody tr:nth-child(even) { background: transparent; }
+
+.sample-table tbody tr td:first-child { padding-left: 20px; }
+.sample-table thead th:first-child { padding-left: 20px; }
+
+.table-card::after {
+  content: '';
+  display: block;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0));
+  margin-top: 6px;
+}
+
+@media (max-width: 860px) {
+  .sample-table { min-width: 640px; }
+  .sample-table thead th, .sample-table tbody td { padding: 10px 12px; font-size: 13px; }
+}
+
+@media (max-width: 520px) {
+  .table-card { box-shadow: none; }
+  .sample-table { min-width: 560px; }
+}

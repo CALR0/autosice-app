@@ -1,0 +1,171 @@
+:root {
+  --text: #6b6375;
+  --text-h: #08060d;
+  --bg: #fff;
+  --border: #e5e4e7;
+  --code-bg: #f4f3ec;
+  --accent: #aa3bff;
+  --accent-bg: rgba(170, 59, 255, 0.1);
+  --accent-border: rgba(170, 59, 255, 0.5);
+  --social-bg: rgba(244, 243, 236, 0.5);
+  --shadow:
+    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+
+  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --mono: ui-monospace, Consolas, monospace;
+
+  font: 18px/145% var(--sans);
+  letter-spacing: 0.18px;
+  color-scheme: light dark;
+  color: var(--text);
+  background: var(--bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  @media (max-width: 1024px) {
+    font-size: 16px;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text: #9ca3af;
+    --text-h: #f3f4f6;
+    --bg: #16171d;
+    --border: #2e303a;
+    --code-bg: #1f2028;
+    --accent: #c084fc;
+    --accent-bg: rgba(192, 132, 252, 0.15);
+    --accent-border: rgba(192, 132, 252, 0.5);
+    --social-bg: rgba(47, 48, 58, 0.5);
+    --shadow:
+      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
+  }
+
+  #social .button-icon {
+    filter: invert(1) brightness(2);
+  }
+}
+
+body {
+  margin: 0;
+}
+
+html, body, #root {
+  min-height: 100vh;
+}
+
+/* Prevent accidental horizontal scrolling caused by wide elements; internal components
+   should implement their own horizontal scrolling (e.g. .table-inner). */
+html, body { overflow-x: hidden; }
+
+/* Page background: layered gradients to ensure an even, full-bleed bottom gradient */
+body {
+  background-color: var(--bg);
+  /* Linear gradient provides a smooth vertical fade across the whole page.
+     Radial gradient adds a subtle center highlight without cutting off at edges. */
+  background-image:
+    linear-gradient(180deg, rgba(2,6,23,0.7) 0%, rgba(2,6,23,0.45) 40%, rgba(2,6,23,0.25) 70%, rgba(2,6,23,0.18) 100%),
+    radial-gradient(circle at 50% 10%, rgba(2,6,23,0.6) 0%, rgba(2,6,23,0.18) 40%, transparent 70%);
+  background-repeat: no-repeat;
+  /* Make the gradient cover the viewport and remain consistent while scrolling */
+  background-size: 100% 100%;
+  background-position: center top;
+  background-attachment: fixed;
+}
+
+@media (max-width: 820px) {
+  /* keep defaults for smaller viewports if needed */
+}
+
+#root {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  text-align: center;
+  min-height: 100vh;
+  display: flex;
+  align-items: stretch; /* don't vertically center the single child */
+  justify-content: center; /* center the main child horizontally */
+  box-sizing: border-box;
+}
+
+h1,
+h2 {
+  font-family: var(--heading);
+  font-weight: 500;
+  color: var(--text-h);
+}
+
+h1 {
+  font-size: 56px;
+  letter-spacing: -1.68px;
+  margin: 32px 0;
+  @media (max-width: 1024px) {
+    font-size: 36px;
+    margin: 20px 0;
+  }
+}
+h2 {
+  font-size: 24px;
+  line-height: 118%;
+  letter-spacing: -0.24px;
+  margin: 0 0 8px;
+  @media (max-width: 1024px) {
+    font-size: 20px;
+  }
+}
+p {
+  margin: 0;
+}
+
+code,
+.counter {
+  font-family: var(--mono);
+  display: inline-flex;
+  border-radius: 4px;
+  color: var(--text-h);
+}
+
+code {
+  font-size: 15px;
+  line-height: 135%;
+  padding: 4px 8px;
+  background: var(--code-bg);
+}
+
+/* Fade-in animation utilities */
+@keyframes fadeInUp {
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.app-body .fade-in {
+  opacity: 0;
+  animation-name: fadeInUp;
+  /* slower, more noticeable entrance */
+  animation-duration: 1000ms;
+  /* slightly bouncy ease for a modern feel */
+  animation-timing-function: cubic-bezier(.16,1,.3,1);
+  animation-fill-mode: forwards;
+}
+
+.app-body .fade-in-slow {
+  animation-duration: 1500ms;
+}
+
+.app-body .stagger-1 { animation-delay: 120ms; }
+.app-body .stagger-2 { animation-delay: 260ms; }
+.app-body .stagger-3 { animation-delay: 420ms; }
+.app-body .stagger-4 { animation-delay: 580ms; }
+.app-body .stagger-5 { animation-delay: 740ms; }
+.app-body .stagger-6 { animation-delay: 900ms; }
+
+/* Reduce motion preference support */
+@media (prefers-reduced-motion: reduce) {
+  .fade-in { animation: none; opacity: 1; transform: none; }
+}

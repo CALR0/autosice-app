@@ -1,0 +1,118 @@
+.upload-card, .app-container {
+  width: 100%;
+  max-width: 640px;
+  margin: 8px auto 22px;
+  padding: 0; /* padding moved to inner box */
+}
+
+/* Light translucent box that encloses the controls */
+.upload-box {
+  margin: 0 auto;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.04);
+  max-width: 560px; /* smaller enclosing box */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.download-btn {
+  appearance: none;
+  display: inline-flex;
+  box-sizing: border-box;
+  line-height: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 8px;
+  border-radius: 8px;
+  background: linear-gradient(90deg,#00c6a7 0%,#00b39b 100%);
+  color: #fff;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 8px 22px rgba(0,179,155,0.12);
+  min-width: 40px;
+  width: 40px;
+  height: 40px;
+}
+.download-btn svg { display: block; margin: 0 auto; width: 18px; height: 18px; }
+.download-btn:hover{ transform: translateY(-2px); box-shadow: 0 14px 34px rgba(0,179,155,0.14); }
+
+.upload-controls, .actions { display:flex; gap:12px; align-items:center; justify-content:center; flex-wrap:wrap; }
+.upload-controls input[type=file], .file-input { display:none; }
+
+/* Unified button base for consistent size and typography */
+.primary-btn, .file-button {
+  min-width: 140px;
+  height: 40px;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 9px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.primary-btn:disabled {
+  background: linear-gradient(90deg,#9e9ea3 0%,#7f7f85 100%);
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 0.75;
+}
+
+.file-input:disabled + .file-button {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Primary action button (Procesar) */
+.primary-btn {
+  padding: 0 18px;
+  color: #fff;
+  background: linear-gradient(90deg,#ff6aa3 0%,#ff4786 100%);
+  border: none;
+  box-shadow: 0 10px 30px rgba(79,18,73,0.14);
+  transition: transform 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
+}
+.primary-btn:hover { transform: translateY(-3px); box-shadow: 0 16px 36px rgba(79,18,73,0.18); }
+
+/* File select button looks like a button but is a label */
+.file-button {
+  padding: 0 14px;
+  background: linear-gradient(90deg, #6b7cff 0%, #5b8be0 100%);
+  color: #fff;
+  border: 1px solid rgba(91,139,224,0.12);
+  box-shadow: 0 6px 18px rgba(91,139,224,0.10);
+  transition: background 160ms ease, transform 140ms ease, box-shadow 160ms ease;
+}
+.file-button:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(91,139,224,0.12); }
+
+
+.file-wrapper { display:inline-flex; align-items:center; gap:12px; padding:6px 8px; border-radius:10px; }
+.file-name { color: var(--muted); font-size: 13px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.process-row { display:flex; justify-content:center; width:100%; }
+
+.upload-status, .status { margin-top: 12px; font-size: 13px; color: var(--muted); text-align:center; }
+.processed-count, .processed-error, .processed-status { font-size:13px; color:var(--muted); margin-top:8px; text-align:center; }
+
+@media (max-width:640px){
+  .upload-controls, .actions { gap: 10px; }
+  .primary-btn, .file-button { width: 100%; min-width: 0; height: 38px; font-size: 13px; }
+  .file-name { max-width: 140px; }
+}
+
+@media (max-width:420px){
+  .upload-box { max-width: 92%; padding: 10px 12px; }
+  .upload-card, .app-container { margin: 8px auto 12px; }
+  .file-name { max-width: 120px; font-size: 12px; }
+}

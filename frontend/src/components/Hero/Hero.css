@@ -1,0 +1,103 @@
+.hero {
+  position: relative;
+}
+
+.hero .app-title {
+  /* Slightly larger clamp to make title more prominent */
+  font-size: clamp(40px, 7.0vw, 84px);
+  margin: 0 0 14px;
+  letter-spacing: -1px;
+  line-height: 1;
+  max-width: 1100px;
+  padding: 0 8px;
+  box-sizing: border-box;
+}
+
+.hero {
+  width: 100%;
+  max-width: 1100px;
+  margin-bottom: 18px; /* small extra gap beneath hero for breathing room */
+  text-align: center;
+  padding: 8px 20px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.hero .hero-desc {
+  font-size: clamp(15px, 1.1vw, 18px);
+  color: var(--text);
+  max-width: 980px;
+  margin: 0 auto 6px;
+}
+
+.app-title {
+  font-size: 56px;
+  margin: 0 0 8px;
+  color: var(--text-h);
+  line-height: 1.02;
+}
+
+.autosice {
+  display: inline-block;
+  background: linear-gradient(90deg, #ffffff, #f3f0ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 2px 20px rgba(255,255,255,0.06);
+  font-weight: 900;
+  margin-right: 8px;
+}
+
+.accent {
+  display: block;
+  font-size: 20px;
+  color: var(--accent);
+  margin-top: 6px;
+  letter-spacing: 1px;
+}
+
+.app-desc {
+  color: var(--text);
+  font-size: 18px;
+  margin: 16px 0 22px;
+  max-width: 820px;
+  display: inline-block;
+  position: relative;
+}
+
+/* blinking caret after description to simulate typing */
+.app-desc::after {
+  content: '|';
+  margin-left: 8px;
+  opacity: 1;
+  animation: blink-caret 1s steps(2, start) infinite;
+  color: var(--muted);
+}
+
+@keyframes blink-caret {
+  0% { opacity: 1; }
+  50% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@media (max-width: 1024px) {
+  .hero .app-title {
+    font-size: 48px;
+  }
+  .hero .hero-desc {
+    font-size: 16px;
+  }
+}
+
+/* Small devices: ensure hero scales and fits without overflow */
+@media (max-width: 420px) {
+  .hero .app-title {
+    font-size: 28px;
+  }
+  .app-title { font-size: 32px; }
+  .autosice { font-size: 32px; }
+  .accent { font-size: 14px; margin-top:4px; }
+  .hero { padding: 6px 12px; }
+  .app-desc { font-size: 14px; max-width: 92%; margin: 12px auto 18px; }
+  .hero .hero-desc { font-size: 14px; }
+}

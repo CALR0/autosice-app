@@ -1,0 +1,104 @@
+/* Lightweight global styles kept here. Component-specific styles have been moved
+   into `src/components/*` CSS files and are imported by their components. */
+
+.counter {
+  font-size: 16px;
+  padding: 5px 10px;
+  border-radius: 5px;
+  color: var(--accent);
+  background: var(--accent-bg);
+  border: 2px solid transparent;
+  transition: border-color 0.3s;
+  margin-bottom: 24px;
+}
+
+#center {
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
+  place-content: center;
+  place-items: center;
+  flex-grow: 1;
+}
+
+#next-steps {
+  display: flex;
+  border-top: 1px solid var(--border);
+  text-align: left;
+}
+
+#docs {
+  border-right: 1px solid var(--border);
+}
+
+#next-steps ul {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  gap: 8px;
+  margin: 32px 0 0;
+}
+
+#spacer {
+  height: 88px;
+  border-top: 1px solid var(--border);
+}
+
+.ticks {
+  position: relative;
+  width: 100%;
+}
+
+.app-body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start; /* start after top padding so content sits lower */
+  padding: 160px 20px 80px; /* larger top padding so title is well below the top */
+  gap: 96px; /* spacing between hero and card */
+  background: transparent;
+  width: 100%;
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+  box-sizing: border-box;
+}
+
+.page-inner {
+  width: min(1100px, 96%);
+  margin-left: auto;
+  margin-right: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+@media (min-width: 1200px) {
+  .app-body {
+    padding-top: 120px;
+    padding-bottom: 120px;
+  }
+}
+
+/* Adjust top spacing responsively */
+@media (max-width: 1024px) {
+  .app-body {
+    padding-top: 120px;
+  }
+}
+
+@media (max-width: 820px) {
+  .app-body {
+    padding-top: 80px;
+    gap: 40px;
+  }
+}
+
+@media (max-width: 420px) {
+  .app-body {
+    padding-top: 60px;
+    gap: 28px;
+    padding-bottom: 60px;
+  }
+}
