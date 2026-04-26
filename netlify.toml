@@ -1,0 +1,8 @@
+[build]
+  base = "frontend"
+  publish = "dist"
+  command = "npm run build"
+
+[context.production.environment]
+# VITE_BACKEND_URL should be set in Netlify UI for production
+# VITE_BACKEND_URL = "https://autosice-app.onrender.com"
