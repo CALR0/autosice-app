@@ -18,6 +18,7 @@ export default function UploadCard({ file, setFile, handleUpload, status, rowsPr
               <span className="file-button">Seleccionar archivo</span>
               <span className="file-name">{file ? file.name : 'Ningún archivo seleccionado'}</span>
             </label>
+            <p className="file-hint">Tamaño máximo 5 MB. Solo archivos Excel (.xlsx, .xls).</p>
           </div>
 
           <div className="process-row">
