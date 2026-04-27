@@ -2,6 +2,9 @@ from flask import Flask, render_template, request, send_file, make_response
 import os
 import threading
 import time
+import uuid
+import json
+from pathlib import Path
 from flask_cors import CORS
 # Note: Do NOT import the heavy `procesador` module at top-level. We import
 # it lazily inside the `/procesar` handler so lightweight endpoints (like
@@ -50,6 +53,62 @@ def start_pinger_if_configured():
 start_pinger_if_configured()
 
 UPLOAD_FOLDER = "."
+
+# Jobs directory for async processing (enqueue -> worker thread)
+JOBS_DIR = Path(os.getenv("JOBS_DIR", "./jobs")).resolve()
+JOBS_DIR.mkdir(parents=True, exist_ok=True)
+
+def _job_meta_path(job_id: str) -> Path:
+    return JOBS_DIR / job_id / "meta.json"
+
+def _job_dir(job_id: str) -> Path:
+    return JOBS_DIR / job_id
+
+def save_job_meta(job_id: str, meta: dict):
+    d = _job_dir(job_id)
+    d.mkdir(parents=True, exist_ok=True)
+    with open(_job_meta_path(job_id), "w", encoding="utf-8") as f:
+        json.dump(meta, f)
+
+def load_job_meta(job_id: str):
+    try:
+        with open(_job_meta_path(job_id), "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+def _job_input_path(job_id: str) -> Path:
+    return _job_dir(job_id) / "input.xlsx"
+
+def _job_output_path(job_id: str) -> Path:
+    return _job_dir(job_id) / "output.xlsx"
+
+def _process_job_async(job_id: str):
+    """Background worker that processes a saved input file and writes output.
+
+    This runs in a daemon thread. It updates job meta with status and errors.
+    """
+    meta = {"status": "running", "started_at": time.time(), "error": None}
+    save_job_meta(job_id, meta)
+    try:
+        # Lazy import (may be heavy)
+        from procesador import procesar_excel
+
+        inp = str(_job_input_path(job_id))
+        out = str(_job_output_path(job_id))
+        processed, errors = procesar_excel(inp, out)
+
+        meta["status"] = "finished"
+        meta["finished_at"] = time.time()
+        meta["rows_processed"] = int(processed)
+        meta["rows_errors"] = int(errors)
+        save_job_meta(job_id, meta)
+    except Exception as e:
+        meta["status"] = "error"
+        meta["error"] = str(e)
+        meta["finished_at"] = time.time()
+        save_job_meta(job_id, meta)
+
 
 @app.route("/")
 def index():
@@ -121,6 +180,48 @@ def procesar():
 
         except Exception as e:
             return f"Error: {str(e)}", 500
+
+
+    @app.route("/enqueue", methods=["POST"])
+    def enqueue():
+        """Enqueue an uploaded file for background processing.
+
+        Returns a job id immediately. Check status at `/job/<id>/status` and
+        download the result at `/job/<id>/download` when ready.
+        """
+        file = request.files.get("file")
+        if file is None:
+            return {"error": "no file uploaded"}, 400
+
+        job_id = uuid.uuid4().hex
+        d = _job_dir(job_id)
+        d.mkdir(parents=True, exist_ok=True)
+        inp = _job_input_path(job_id)
+        file.save(str(inp))
+
+        meta = {"status": "queued", "created_at": time.time()}
+        save_job_meta(job_id, meta)
+
+        t = threading.Thread(target=_process_job_async, args=(job_id,), daemon=True)
+        t.start()
+
+        return {"job_id": job_id, "status_url": f"/job/{job_id}/status", "download_url": f"/job/{job_id}/download"}, 202
+
+
+    @app.route("/job/<job_id>/status", methods=["GET"])
+    def job_status(job_id):
+        meta = load_job_meta(job_id)
+        if not meta:
+            return {"error": "job not found"}, 404
+        return meta
+
+
+    @app.route("/job/<job_id>/download", methods=["GET"])
+    def job_download(job_id):
+        out = _job_output_path(job_id)
+        if not out.exists():
+            return {"error": "result not ready"}, 404
+        return send_file(str(out), as_attachment=True, download_name=f"resultado_{job_id}.xlsx")
 
 
 @app.route("/health", methods=["GET"])
