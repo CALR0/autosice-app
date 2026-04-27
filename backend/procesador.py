@@ -18,7 +18,7 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE):
     URL = "https://plc.mintransporte.gov.co/runtime/empresa/ctl/sicetac/mid/417"
     # If FAST_PROCESSING=1 in the environment, enable optimizations (resource blocking, shorter waits)
     FAST_PROCESSING = os.getenv("FAST_PROCESSING", "0") == "1"
-    WAIT_TIME = float(os.getenv("WAIT_TIME", "0.5")) if FAST_PROCESSING else float(os.getenv("WAIT_TIME", "1"))
+    WAIT_TIME = float(os.getenv("WAIT_TIME", "0.35")) if FAST_PROCESSING else float(os.getenv("WAIT_TIME", "1"))
     # When FAST_PROCESSING is enabled, checkpoint (write Excel to disk) less frequently to avoid heavy I/O.
     # Default checkpoint every 10 rows in fast mode, or every row in normal mode (preserves previous behavior).
     DEFAULT_CHECKPOINT_FAST = 10
@@ -108,6 +108,18 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE):
                 time.sleep(WAIT_TIME)
             except Exception:
                 pass
+
+
+    def wait_for_significant_response(page, timeout_ms=8000):
+        """Try to wait for a likely significant XHR/Fetch response triggered by
+        a recent select or click. Returns True if a response arrived, False
+        otherwise. This is a heuristic; it falls back silently.
+        """
+        try:
+            page.wait_for_response(lambda r: (r.request.method in ("POST", "GET")) and (200 <= r.status < 300), timeout=timeout_ms)
+            return True
+        except Exception:
+            return False
 
     def seleccionar_opcion(page, selector, valor_excel):
         # Wait until the select is populated
@@ -320,7 +332,16 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE):
                             df_output.at[i, "resultado"] = f"No existe configuracion: {row['configuracion']}"
                             break
 
-                        esperar_postback(page)
+                        # Smart wait: prefer waiting for a meaningful XHR response,
+                        # fall back to the generic postback wait.
+                        try:
+                            if not wait_for_significant_response(page, timeout_ms=8000):
+                                esperar_postback(page)
+                        except Exception:
+                            try:
+                                esperar_postback(page)
+                            except Exception:
+                                pass
                         log_debug(f"row {i}: config selected elapsed={time.time()-row_t0:.3f}s")
 
                     # Validar/seleccionar condicion (exact match required)
@@ -329,7 +350,14 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE):
                         break
                     seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_CONDICIONCARGA", row["condicion"])
 
-                    esperar_postback(page)
+                    try:
+                        if not wait_for_significant_response(page, timeout_ms=8000):
+                            esperar_postback(page)
+                    except Exception:
+                        try:
+                            esperar_postback(page)
+                        except Exception:
+                            pass
                     log_debug(f"row {i}: condicion selected elapsed={time.time()-row_t0:.3f}s")
 
                     # carroceria / unidad transporte (exact match required)
@@ -338,7 +366,14 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE):
                         break
                     seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_UNIDADTRANSPORTE", row["carroceria"])
 
-                    esperar_postback(page)
+                    try:
+                        if not wait_for_significant_response(page, timeout_ms=8000):
+                            esperar_postback(page)
+                    except Exception:
+                        try:
+                            esperar_postback(page)
+                        except Exception:
+                            pass
                     log_debug(f"row {i}: carroceria selected elapsed={time.time()-row_t0:.3f}s")
 
                     condicion = normalizar(row["condicion"])
