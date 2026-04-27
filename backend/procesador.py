@@ -4,6 +4,7 @@ import pandas as pd
 from playwright.sync_api import sync_playwright
 import re
 import time
+import os
 import unicodedata
 import os
 
@@ -15,7 +16,9 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE):
     # ============================================================
 
     URL = "https://plc.mintransporte.gov.co/runtime/empresa/ctl/sicetac/mid/417"
-    WAIT_TIME = 1
+    # If FAST_PROCESSING=1 in the environment, enable optimizations (resource blocking, shorter waits)
+    FAST_PROCESSING = os.getenv("FAST_PROCESSING", "0") == "1"
+    WAIT_TIME = 0.5 if FAST_PROCESSING else 1
 
 
     # ============================================================
@@ -139,8 +142,31 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE):
     # ============================================================
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        # launch browser; keep headless for production
+        browser = p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-setuid-sandbox"]) 
         page = browser.new_page()
+
+        # If FAST_PROCESSING enabled, block heavy/irrelevant resources to speed up navigation
+        if FAST_PROCESSING:
+            blocked_resource_types = {"image", "media", "font", "stylesheet"}
+            def _route_handler(route, request):
+                try:
+                    rt = request.resource_type
+                    url = request.url
+                    if rt in blocked_resource_types or "google-analytics" in url or "doubleclick" in url:
+                        route.abort()
+                    else:
+                        route.continue_()
+                except Exception:
+                    try:
+                        route.continue_()
+                    except Exception:
+                        pass
+
+            page.route("**/*", _route_handler)
+            # reduce some default timeouts to fail faster on slow calls
+            page.set_default_navigation_timeout(30000)
+            page.set_default_timeout(30000)
         page.goto(URL)
 
         for i, row in df_output.iterrows():
