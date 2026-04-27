@@ -5,6 +5,7 @@ import time
 import uuid
 import json
 from pathlib import Path
+import shutil
 from flask_cors import CORS
 # Note: Do NOT import the heavy `procesador` module at top-level. We import
 # it lazily inside the `/procesar` handler so lightweight endpoints (like
@@ -109,6 +110,9 @@ def _process_job_async(job_id: str):
         meta["finished_at"] = time.time()
         save_job_meta(job_id, meta)
 
+# Maximum upload size for files (bytes). Default 5 MB.
+MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(5 * 1024 * 1024)))
+
 
 @app.route("/")
 def index():
@@ -130,9 +134,18 @@ def procesar():
     except Exception:
         return "Error: backend not ready (failed to import processing module)", 500
 
+    # Basic upload validation: check content-length header first (fast),
+    # then validate filename extension and finally check saved file size.
+    if request.content_length and request.content_length > MAX_UPLOAD_BYTES:
+        return "Error: file too large", 413
+
     file = request.files.get("file")
     if file is None:
         return "Error: no file uploaded", 400
+
+    filename = (file.filename or "").lower()
+    if not (filename.endswith('.xlsx') or filename.endswith('.xls')):
+        return "Error: only Excel files are allowed (.xlsx, .xls)", 400
 
     # Use a temporary directory so uploaded input is not persisted in the backend folder
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -141,6 +154,17 @@ def procesar():
 
         # Guardar archivo temporalmente
         file.save(input_path)
+
+        # Check actual saved size; reject if larger than allowed
+        try:
+            if os.path.getsize(input_path) > MAX_UPLOAD_BYTES:
+                try:
+                    os.remove(input_path)
+                except Exception:
+                    pass
+                return "Error: file too large", 413
+        except Exception:
+            pass
 
         try:
             # Ejecutar tu script y obtener cuántas filas se procesaron/errores
@@ -189,15 +213,35 @@ def procesar():
         Returns a job id immediately. Check status at `/job/<id>/status` and
         download the result at `/job/<id>/download` when ready.
         """
+        # quick content-length check
+        if request.content_length and request.content_length > MAX_UPLOAD_BYTES:
+            return {"error": "file too large"}, 413
+
         file = request.files.get("file")
         if file is None:
             return {"error": "no file uploaded"}, 400
+
+        filename = (file.filename or "").lower()
+        if not (filename.endswith('.xlsx') or filename.endswith('.xls')):
+            return {"error": "only Excel files are allowed (.xlsx, .xls)"}, 400
 
         job_id = uuid.uuid4().hex
         d = _job_dir(job_id)
         d.mkdir(parents=True, exist_ok=True)
         inp = _job_input_path(job_id)
         file.save(str(inp))
+
+        # verify saved size and cleanup if too large
+        try:
+            if inp.exists() and inp.stat().st_size > MAX_UPLOAD_BYTES:
+                # remove job dir
+                try:
+                    shutil.rmtree(str(d))
+                except Exception:
+                    pass
+                return {"error": "file too large"}, 413
+        except Exception:
+            pass
 
         meta = {"status": "queued", "created_at": time.time()}
         save_job_meta(job_id, meta)

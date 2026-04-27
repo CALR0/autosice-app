@@ -41,10 +41,22 @@ function App() {
   const [downloadName, setDownloadName] = useState('resultado.xlsx');
   const [isProcessing, setIsProcessing] = useState(false);
   const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://127.0.0.1:5000';
+  const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 
   const handleUpload = async () => {
     if (!file) {
       setStatus("Selecciona un archivo primero");
+      return;
+    }
+
+    // Client-side validation: extension and size
+    const name = (file.name || '').toLowerCase();
+    if (!name.endsWith('.xlsx') && !name.endsWith('.xls')) {
+      setStatus('Solo se permiten archivos Excel (.xlsx, .xls)');
+      return;
+    }
+    if (file.size > MAX_SIZE_BYTES) {
+      setStatus('Archivo demasiado grande (máx 5 MB).');
       return;
     }
 
