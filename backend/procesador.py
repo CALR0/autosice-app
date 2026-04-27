@@ -18,7 +18,11 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE):
     URL = "https://plc.mintransporte.gov.co/runtime/empresa/ctl/sicetac/mid/417"
     # If FAST_PROCESSING=1 in the environment, enable optimizations (resource blocking, shorter waits)
     FAST_PROCESSING = os.getenv("FAST_PROCESSING", "0") == "1"
-    WAIT_TIME = 0.5 if FAST_PROCESSING else 1
+    WAIT_TIME = float(os.getenv("WAIT_TIME", "0.5")) if FAST_PROCESSING else float(os.getenv("WAIT_TIME", "1"))
+    # When FAST_PROCESSING is enabled, checkpoint (write Excel to disk) less frequently to avoid heavy I/O.
+    # Default checkpoint every 10 rows in fast mode, or every row in normal mode (preserves previous behavior).
+    DEFAULT_CHECKPOINT_FAST = 10
+    CHECKPOINT_EVERY = int(os.getenv("CHECKPOINT_EVERY", str(DEFAULT_CHECKPOINT_FAST if FAST_PROCESSING else 1)))
 
 
     # ============================================================
@@ -328,10 +332,27 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE):
                     time.sleep(2)
 
             # Guardar el estado tras procesar (o marcar error) la fila actual
-            df_output.to_excel(OUTPUT_FILE, index=False)
+            # To reduce expensive disk I/O, only checkpoint every CHECKPOINT_EVERY rows when FAST_PROCESSING is enabled.
+            try:
+                if CHECKPOINT_EVERY <= 1:
+                    df_output.to_excel(OUTPUT_FILE, index=False)
+                else:
+                    # i is zero-based; write when we've processed a multiple of CHECKPOINT_EVERY or on the final row
+                    if (i + 1) % CHECKPOINT_EVERY == 0:
+                        df_output.to_excel(OUTPUT_FILE, index=False)
+            except Exception:
+                # On any write failure, ignore to avoid crashing processing loop; final save will attempt to persist results.
+                pass
+
             time.sleep(WAIT_TIME)
 
         browser.close()
+
+    # Final checkpoint: ensure output file is written at least once after processing completes
+    try:
+        df_output.to_excel(OUTPUT_FILE, index=False)
+    except Exception:
+        pass
 
     # Calcular cuántas filas fueron procesadas con éxito y cuántas con error
     try:
