@@ -82,27 +82,47 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE):
         # Wait until the select is populated
         esperar_select(page, selector)
 
-        opciones = page.locator(f"{selector} option")
         valor_norm = normalizar(valor_excel)
 
+        # Try to use cached mapping if available
+        mapping_entry = selector_cache.get(selector)
+        if mapping_entry is None:
+            mapping = build_selector_map(selector)
+        else:
+            mapping = mapping_entry[0]
+
+        value = mapping.get(valor_norm)
+        if value:
+            page.select_option(selector, value=value)
+            # If selecting ORIGEN, invalidate DESTINO cache because it depends on origen
+            if selector == "#dnn_ctr417_SiceTAC_ORIGEN":
+                selector_cache.pop("#dnn_ctr417_SiceTAC_DESTINO", None)
+            return
+
+        # Fallback: scan options for fuzzy matches (as before)
+        opciones = page.locator(f"{selector} option")
         mejor_match = None
-
         for i in range(opciones.count()):
-            texto = opciones.nth(i).inner_text().strip()
-            texto_norm = normalizar(texto)
-
-            if texto_norm == valor_norm:
-                page.select_option(selector, value=opciones.nth(i).get_attribute("value"))
-                return
-
-            if valor_norm in texto_norm or texto_norm in valor_norm:
-                mejor_match = opciones.nth(i)
+            try:
+                texto = opciones.nth(i).inner_text().strip()
+                texto_norm = normalizar(texto)
+                if texto_norm == valor_norm:
+                    page.select_option(selector, value=opciones.nth(i).get_attribute("value"))
+                    if selector == "#dnn_ctr417_SiceTAC_ORIGEN":
+                        selector_cache.pop("#dnn_ctr417_SiceTAC_DESTINO", None)
+                    return
+                if valor_norm in texto_norm or texto_norm in valor_norm:
+                    mejor_match = opciones.nth(i)
+            except Exception:
+                continue
 
         if mejor_match:
             page.select_option(selector, value=mejor_match.get_attribute("value"))
+            if selector == "#dnn_ctr417_SiceTAC_ORIGEN":
+                selector_cache.pop("#dnn_ctr417_SiceTAC_DESTINO", None)
             return
 
-        # If no match, raise a clear exception (caller may include field name when constructing message)
+        # If no match, raise a clear exception
         raise Exception(f"No se encontró opción para: {valor_excel}")
 
     def option_exists(page, selector, valor_excel):
@@ -112,15 +132,16 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE):
         except Exception:
             return False
 
-        opciones = page.locator(f"{selector} option")
         valor_norm = normalizar(valor_excel)
 
-        for j in range(opciones.count()):
-            texto = opciones.nth(j).inner_text().strip()
-            texto_norm = normalizar(texto)
-            if texto_norm == valor_norm:
-                return True
-        return False
+        # Use cache if available
+        mapping_entry = selector_cache.get(selector)
+        if mapping_entry is None:
+            mapping = build_selector_map(selector)
+        else:
+            mapping = mapping_entry[0]
+
+        return valor_norm in mapping
 
 
     # ============================================================
@@ -149,6 +170,24 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE):
         # launch browser; keep headless for production
         browser = p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-setuid-sandbox"]) 
         page = browser.new_page()
+
+        # selector options cache: selector -> (mapping(normalized_text->value), count)
+        selector_cache = {}
+
+        def build_selector_map(selector):
+            """Build and cache a mapping normalized_text -> option value for a select."""
+            opciones = page.locator(f"{selector} option")
+            cnt = opciones.count()
+            mapping = {}
+            for k in range(cnt):
+                try:
+                    texto = opciones.nth(k).inner_text().strip()
+                    val = opciones.nth(k).get_attribute("value")
+                    mapping[normalizar(texto)] = val
+                except Exception:
+                    continue
+            selector_cache[selector] = (mapping, cnt)
+            return mapping
 
         # If FAST_PROCESSING enabled, block heavy/irrelevant resources to speed up navigation
         if FAST_PROCESSING:
