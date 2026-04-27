@@ -85,8 +85,29 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE):
         """)
 
     def esperar_postback(page):
-        page.wait_for_load_state("networkidle")
-        time.sleep(WAIT_TIME)
+        # Prefer a fast networkidle wait; if it times out, fall back to
+        # domcontentloaded. Use Playwright's `wait_for_timeout` instead of
+        # Python sleep so the event loop stays responsive.
+        try:
+            if FAST_PROCESSING:
+                page.wait_for_load_state("networkidle", timeout=5000)
+            else:
+                page.wait_for_load_state("networkidle")
+        except Exception:
+            try:
+                page.wait_for_load_state("domcontentloaded", timeout=(2000 if FAST_PROCESSING else 10000))
+            except Exception:
+                pass
+
+        try:
+            # WAIT_TIME is in seconds; Playwright expects ms
+            page.wait_for_timeout(int(WAIT_TIME * 1000))
+        except Exception:
+            # fallback to time.sleep if Playwright wait isn't available
+            try:
+                time.sleep(WAIT_TIME)
+            except Exception:
+                pass
 
     def seleccionar_opcion(page, selector, valor_excel):
         # Wait until the select is populated
@@ -226,6 +247,22 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE):
             page.set_default_navigation_timeout(30000)
             page.set_default_timeout(30000)
         page.goto(URL)
+
+        # Optional: prebuild selector maps for selectors listed in PREBUILD_SELECTS
+        # env var (comma-separated selectors). This is useful when selects are
+        # large but stable and avoids building maps per-row.
+        prebuild_raw = os.getenv("PREBUILD_SELECTS", "")
+        if prebuild_raw:
+            try:
+                prebuild_list = [s.strip() for s in prebuild_raw.split(",") if s.strip()]
+                for sel in prebuild_list:
+                    try:
+                        build_selector_map(sel)
+                        log_debug(f"prebuilt selector: {sel}")
+                    except Exception as e:
+                        log_debug(f"prebuild failed for {sel}: {e}")
+            except Exception:
+                pass
 
         for i, row in df_output.iterrows():
 
