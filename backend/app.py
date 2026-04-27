@@ -53,7 +53,13 @@ UPLOAD_FOLDER = "."
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    # Serve a minimal landing response from the backend. The full frontend is
+    # expected to be served separately (Netlify). Returning a simple HTML
+    # avoids TemplateNotFound errors when `templates/index.html` is missing.
+    return (
+        "<html><head><meta charset=\"utf-8\"><title>Autosice API</title></head>"
+        "<body><h3>Autosice backend</h3><p>Use the <a href=\"/health\">/health</a> endpoint.</p></body></html>"
+    )
 
 
 @app.route("/procesar", methods=["POST"])
@@ -117,15 +123,31 @@ def procesar():
             return f"Error: {str(e)}", 500
 
 
-    @app.route("/health", methods=["GET"])
-    def health():
-        """Lightweight health endpoint.
+@app.route("/health", methods=["GET"])
+def health():
+    """Lightweight health endpoint.
 
-        This endpoint is intentionally minimal: it does not import or start
-        Playwright or other heavy dependencies and returns quickly so uptime
-        pingers keep the free Render instance awake.
-        """
-        return {"status": "ok"}, 200
+    This endpoint is intentionally minimal: it does not import or start
+    Playwright or other heavy dependencies and returns quickly so uptime
+    pingers keep the free Render instance awake.
+    """
+    return {"status": "ok"}, 200
+
+
+@app.route("/ready", methods=["GET"])
+def ready():
+    """Readiness probe: attempt to import the heavy processing module.
+
+    - Returns 200 when `procesador` can be imported (module available).
+    - Returns 500 with the import error message otherwise.
+    Note: calling this will trigger imports in `procesador` (Playwright/pandas).
+    """
+    try:
+        import importlib
+        importlib.import_module("procesador")
+        return {"status": "ready"}, 200
+    except Exception as e:
+        return {"status": "not ready", "error": str(e)}, 500
 
 
 if __name__ == "__main__":

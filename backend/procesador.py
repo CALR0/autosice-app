@@ -23,6 +23,16 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE):
     # Default checkpoint every 10 rows in fast mode, or every row in normal mode (preserves previous behavior).
     DEFAULT_CHECKPOINT_FAST = 10
     CHECKPOINT_EVERY = int(os.getenv("CHECKPOINT_EVERY", str(DEFAULT_CHECKPOINT_FAST if FAST_PROCESSING else 1)))
+    # Optional debug timings: set DEBUG_TIMINGS=1 in the environment to enable
+    # lightweight per-row timing logs (prints to stdout). Default off.
+    DEBUG_TIMINGS = os.getenv("DEBUG_TIMINGS", "0") == "1"
+
+    def log_debug(*args):
+        if DEBUG_TIMINGS:
+            try:
+                print("[timing]", *args)
+            except Exception:
+                pass
 
 
     # ============================================================
@@ -176,6 +186,7 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE):
 
         def build_selector_map(selector):
             """Build and cache a mapping normalized_text -> option value for a select."""
+            t0 = time.time()
             opciones = page.locator(f"{selector} option")
             cnt = opciones.count()
             mapping = {}
@@ -187,6 +198,7 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE):
                 except Exception:
                     continue
             selector_cache[selector] = (mapping, cnt)
+            log_debug(f"build_selector_map {selector}: options={cnt} time={time.time()-t0:.3f}s")
             return mapping
 
         # If FAST_PROCESSING enabled, block heavy/irrelevant resources to speed up navigation
@@ -214,7 +226,11 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE):
 
         for i, row in df_output.iterrows():
 
+            row_t0 = time.time()
+            log_debug(f"start row {i}")
+
             if str(row.get("resultado", "")).strip() == "Completado con éxito":
+                log_debug(f"skip row {i}: already completed")
                 continue
 
             # Validar datos requeridos antes de intentar procesar la fila
@@ -264,21 +280,26 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE):
                             df_output.at[i, "resultado"] = f"No existe configuracion: {row['configuracion']}"
                             break
 
-                    esperar_postback(page)
+                        esperar_postback(page)
+                        log_debug(f"row {i}: config selected elapsed={time.time()-row_t0:.3f}s")
 
                     # Validar/seleccionar condicion (exact match required)
                     if not option_exists(page, "#dnn_ctr417_SiceTAC_CONDICIONCARGA", row["condicion"]):
                         df_output.at[i, "resultado"] = f"No existe condicion: {row['condicion']}"
                         break
                     seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_CONDICIONCARGA", row["condicion"])
+
                     esperar_postback(page)
+                    log_debug(f"row {i}: condicion selected elapsed={time.time()-row_t0:.3f}s")
 
                     # carroceria / unidad transporte (exact match required)
                     if not option_exists(page, "#dnn_ctr417_SiceTAC_UNIDADTRANSPORTE", row["carroceria"]):
                         df_output.at[i, "resultado"] = f"No existe unidad transporte (carroceria): {row['carroceria']}"
                         break
                     seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_UNIDADTRANSPORTE", row["carroceria"])
+
                     esperar_postback(page)
+                    log_debug(f"row {i}: carroceria selected elapsed={time.time()-row_t0:.3f}s")
 
                     condicion = normalizar(row["condicion"])
 
@@ -294,13 +315,17 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE):
                         df_output.at[i, "resultado"] = f"No existe origen: {row['origen']}"
                         break
                     seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_ORIGEN", row["origen"])
+
                     esperar_select(page, "#dnn_ctr417_SiceTAC_DESTINO")
+                    log_debug(f"row {i}: origen selected elapsed={time.time()-row_t0:.3f}s")
 
                     # Destino: must exist exactly after origen selection
                     if not option_exists(page, "#dnn_ctr417_SiceTAC_DESTINO", row["destino"]):
                         df_output.at[i, "resultado"] = f"No existe destino: {row['destino']}"
                         break
                     seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_DESTINO", row["destino"])
+
+                    log_debug(f"row {i}: destino selected elapsed={time.time()-row_t0:.3f}s")
 
                     page.fill("#dnn_ctr417_SiceTAC_HORASCARGUE", str(row["hora_cargue"]))
                     page.fill("#dnn_ctr417_SiceTAC_HORASDESCARGUE", str(row["hora_descargue"]))
@@ -319,6 +344,8 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE):
                         return el && el.value !== valor;
                     }
                     """, arg=valor_antes)
+
+                    log_debug(f"row {i}: calculation finished elapsed={time.time()-row_t0:.3f}s")
 
                     df_output.at[i, "ruta"] = page.locator("#dnn_ctr417_SiceTAC_RUTA option:checked").inner_text()
                     df_output.at[i, "costo_total"] = page.input_value("#dnn_ctr417_SiceTAC_COSTOTOTALVIAJE")
@@ -343,6 +370,7 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE):
                         df_output.at[i, "resultado"] = "Error: no se obtuvieron costos (posible caída del sitio)"
                     else:
                         df_output.at[i, "resultado"] = "Completado con éxito"
+                    log_debug(f"row {i}: finished total_elapsed={time.time()-row_t0:.3f}s resultado={df_output.at[i,'resultado']}")
                     break
 
                 except Exception as e:
