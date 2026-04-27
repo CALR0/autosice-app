@@ -108,26 +108,20 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE):
             if selector == "#dnn_ctr417_SiceTAC_ORIGEN":
                 selector_cache.pop("#dnn_ctr417_SiceTAC_DESTINO", None)
             return
-
-        # Fallback: scan options for fuzzy matches (as before)
-        opciones = page.locator(f"{selector} option")
-        mejor_match = None
-        for i in range(opciones.count()):
+        # Fallback: fuzzy-match against cached mapping keys (cheap, no DOM calls).
+        mejor_val = None
+        for texto_norm, val in mapping.items():
             try:
-                texto = opciones.nth(i).inner_text().strip()
-                texto_norm = normalizar(texto)
                 if texto_norm == valor_norm:
-                    page.select_option(selector, value=opciones.nth(i).get_attribute("value"))
-                    if selector == "#dnn_ctr417_SiceTAC_ORIGEN":
-                        selector_cache.pop("#dnn_ctr417_SiceTAC_DESTINO", None)
-                    return
+                    mejor_val = val
+                    break
                 if valor_norm in texto_norm or texto_norm in valor_norm:
-                    mejor_match = opciones.nth(i)
+                    mejor_val = val
             except Exception:
                 continue
 
-        if mejor_match:
-            page.select_option(selector, value=mejor_match.get_attribute("value"))
+        if mejor_val:
+            page.select_option(selector, value=mejor_val)
             if selector == "#dnn_ctr417_SiceTAC_ORIGEN":
                 selector_cache.pop("#dnn_ctr417_SiceTAC_DESTINO", None)
             return
@@ -185,18 +179,27 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE):
         selector_cache = {}
 
         def build_selector_map(selector):
-            """Build and cache a mapping normalized_text -> option value for a select."""
+            """Build and cache a mapping normalized_text -> option value for a select.
+
+            Use a single `page.evaluate` call to extract option texts/values in the
+            browser context (faster than many Python<->page round-trips).
+            """
             t0 = time.time()
-            opciones = page.locator(f"{selector} option")
-            cnt = opciones.count()
+            try:
+                items = page.evaluate(
+                    "(sel) => Array.from(document.querySelectorAll(sel + ' option')).map(o => ({t: o.innerText.trim(), v: o.value}))",
+                    selector,
+                )
+            except Exception:
+                items = []
+
             mapping = {}
-            for k in range(cnt):
+            for it in items:
                 try:
-                    texto = opciones.nth(k).inner_text().strip()
-                    val = opciones.nth(k).get_attribute("value")
-                    mapping[normalizar(texto)] = val
+                    mapping[normalizar(it.get('t', ''))] = it.get('v', '')
                 except Exception:
                     continue
+            cnt = len(items)
             selector_cache[selector] = (mapping, cnt)
             log_debug(f"build_selector_map {selector}: options={cnt} time={time.time()-t0:.3f}s")
             return mapping
