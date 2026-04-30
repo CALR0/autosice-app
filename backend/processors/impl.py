@@ -63,7 +63,8 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE, job_meta_path=None):
         browser = p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-setuid-sandbox"])
         page = browser.new_page()
 
-        selector_cache = {}
+        from collections import OrderedDict
+        selector_cache = OrderedDict()
 
         if FAST_PROCESSING:
             setup_resource_blocking(page, FAST_PROCESSING)
@@ -76,7 +77,21 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE, job_meta_path=None):
                 for sel in prebuild_list:
                     try:
                         mapping, cnt = build_selector_map(page, sel, normalizar, log_debug)
-                        selector_cache[sel] = (mapping, cnt)
+                        # insert with simple LRU eviction (max 8)
+                        try:
+                            if sel in selector_cache:
+                                try:
+                                    del selector_cache[sel]
+                                except Exception:
+                                    pass
+                            selector_cache[sel] = (mapping, cnt)
+                            try:
+                                while len(selector_cache) > 8:
+                                    selector_cache.popitem(last=False)
+                            except Exception:
+                                pass
+                        except Exception:
+                            selector_cache[sel] = (mapping, cnt)
                         log_debug(f"prebuilt selector: {sel}")
                     except Exception as e:
                         log_debug(f"prebuild failed for {sel}: {e}")
@@ -307,7 +322,16 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE, job_meta_path=None):
                 except Exception:
                     pass
 
-            time.sleep(WAIT_TIME)
+            # small wait and force garbage collection to reduce memory pressure on constrained instances
+            try:
+                time.sleep(WAIT_TIME)
+            except Exception:
+                pass
+            try:
+                import gc
+                gc.collect()
+            except Exception:
+                pass
 
         browser.close()
 

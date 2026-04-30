@@ -103,18 +103,20 @@ def build_selector_map(page, selector, normalizar, log_debug=None):
             except Exception:
                 pass
 
-            # index on individual tokens (words) to match partial inputs like 'bogot' or 'bogota'
+            # Only create token-level indexes for large city lists (ORIGEN/DESTINO)
             try:
-                for tok in norm_full.split():
-                    if len(tok) > 2 and tok not in mapping:
-                        mapping[tok] = opt_val
-            except Exception:
-                pass
-            # also add variant stripping common abbreviations like 'd c' or 'dc'
-            try:
-                stripped = _re.sub(r"\b(d\.?\s*c\.?|dc)\b", "", norm_full).strip()
-                if stripped and stripped not in mapping:
-                    mapping[stripped] = opt_val
+                if 'ORIGEN' in selector.upper() or 'DESTINO' in selector.upper():
+                    for tok in norm_full.split():
+                        if len(tok) > 2 and tok not in mapping:
+                            mapping[tok] = opt_val
+
+                    # also add variant stripping common abbreviations like 'd c' or 'dc'
+                    try:
+                        stripped = _re.sub(r"\b(d\.?\s*c\.?|dc)\b", "", norm_full).strip()
+                        if stripped and stripped not in mapping:
+                            mapping[stripped] = opt_val
+                    except Exception:
+                        pass
             except Exception:
                 pass
         except Exception:
@@ -137,7 +139,31 @@ def seleccionar_opcion(page, selector, valor_excel, selector_cache, normalizar, 
     mapping_entry = selector_cache.get(selector)
     if mapping_entry is None:
         mapping, cnt = build_selector_map(page, selector, normalizar, log_debug)
-        selector_cache[selector] = (mapping, cnt)
+        # insert with simple LRU eviction (keep last 8 entries)
+        try:
+            if selector in selector_cache:
+                try:
+                    del selector_cache[selector]
+                except Exception:
+                    pass
+            selector_cache[selector] = (mapping, cnt)
+            # evict oldest if cache too large
+            try:
+                while len(selector_cache) > 8:
+                    # pop oldest
+                    k, _ = next(iter(selector_cache.items()))
+                    try:
+                        selector_cache.pop(k, None)
+                    except Exception:
+                        break
+            except Exception:
+                pass
+        except Exception:
+            # fallback: assign normally
+            try:
+                selector_cache[selector] = (mapping, cnt)
+            except Exception:
+                pass
     else:
         mapping = mapping_entry[0]
 
@@ -179,7 +205,28 @@ def option_exists(page, selector, valor_excel, selector_cache, normalizar, log_d
     mapping_entry = selector_cache.get(selector)
     if mapping_entry is None:
         mapping, cnt = build_selector_map(page, selector, normalizar, log_debug)
-        selector_cache[selector] = (mapping, cnt)
+        # insert with simple LRU eviction
+        try:
+            if selector in selector_cache:
+                try:
+                    del selector_cache[selector]
+                except Exception:
+                    pass
+            selector_cache[selector] = (mapping, cnt)
+            try:
+                while len(selector_cache) > 8:
+                    k, _ = next(iter(selector_cache.items()))
+                    try:
+                        selector_cache.pop(k, None)
+                    except Exception:
+                        break
+            except Exception:
+                pass
+        except Exception:
+            try:
+                selector_cache[selector] = (mapping, cnt)
+            except Exception:
+                pass
     else:
         mapping = mapping_entry[0]
 
