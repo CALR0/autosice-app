@@ -108,8 +108,8 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE, job_meta_path=None):
             ]
             for sel in small_selectors:
                 try:
-                    if sel not in selector_cache:
-                        mapping, cnt = build_selector_map(page, sel, normalizar, log_debug)
+                        if sel not in selector_cache:
+                            mapping, cnt = build_selector_map(page, sel, normalizar, log_debug)
                         # insert with LRU eviction
                         try:
                             if sel in selector_cache:
@@ -117,6 +117,11 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE, job_meta_path=None):
                         except Exception:
                             pass
                         selector_cache[sel] = (mapping, cnt)
+                        try:
+                            from services.playwright_service import inject_selector_map
+                            inject_selector_map(page, sel, mapping)
+                        except Exception:
+                            pass
                         try:
                             while len(selector_cache) > 8:
                                 selector_cache.popitem(last=False)
@@ -172,8 +177,21 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE, job_meta_path=None):
                             pass
                     if not found_conf:
                         if option_exists(page, "#dnn_ctr417_SiceTAC_CONFIGURACION", row["configuracion"], selector_cache, normalizar, log_debug):
-                            seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_CONFIGURACION", row["configuracion"], selector_cache, normalizar, log_debug)
-                            found_conf = True
+                            # try fast page-side select using prebuilt map
+                            try:
+                                mapping = selector_cache.get("#dnn_ctr417_SiceTAC_CONFIGURACION", ({}, 0))[0]
+                                val = mapping.get(normalizar(row["configuracion"]))
+                                if val:
+                                    from services.playwright_service import select_option_via_page_map
+                                    ok = select_option_via_page_map(page, "#dnn_ctr417_SiceTAC_CONFIGURACION", val)
+                                    if ok:
+                                        found_conf = True
+                                if not found_conf:
+                                    seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_CONFIGURACION", row["configuracion"], selector_cache, normalizar, log_debug)
+                                    found_conf = True
+                            except Exception:
+                                seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_CONFIGURACION", row["configuracion"], selector_cache, normalizar, log_debug)
+                                found_conf = True
                         else:
                             df_output.at[i, "resultado"] = f"No existe configuracion: {row['configuracion']}"
                             break
@@ -191,7 +209,19 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE, job_meta_path=None):
                     if not option_exists(page, "#dnn_ctr417_SiceTAC_CONDICIONCARGA", row["condicion"], selector_cache, normalizar, log_debug):
                         df_output.at[i, "resultado"] = f"No existe condicion: {row['condicion']}"
                         break
-                    seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_CONDICIONCARGA", row["condicion"], selector_cache, normalizar, log_debug)
+                    try:
+                        mapping = selector_cache.get("#dnn_ctr417_SiceTAC_CONDICIONCARGA", ({}, 0))[0]
+                        val = mapping.get(normalizar(row["condicion"]))
+                        if val:
+                            from services.playwright_service import select_option_via_page_map
+                            if select_option_via_page_map(page, "#dnn_ctr417_SiceTAC_CONDICIONCARGA", val):
+                                pass
+                            else:
+                                seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_CONDICIONCARGA", row["condicion"], selector_cache, normalizar, log_debug)
+                        else:
+                            seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_CONDICIONCARGA", row["condicion"], selector_cache, normalizar, log_debug)
+                    except Exception:
+                        seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_CONDICIONCARGA", row["condicion"], selector_cache, normalizar, log_debug)
 
                     try:
                         if not wait_for_significant_response(page, timeout_ms=1000):
@@ -206,7 +236,19 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE, job_meta_path=None):
                     if not option_exists(page, "#dnn_ctr417_SiceTAC_UNIDADTRANSPORTE", row["carroceria"], selector_cache, normalizar, log_debug):
                         df_output.at[i, "resultado"] = f"No existe unidad transporte (carroceria): {row['carroceria']}"
                         break
-                    seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_UNIDADTRANSPORTE", row["carroceria"], selector_cache, normalizar, log_debug)
+                    try:
+                        mapping = selector_cache.get("#dnn_ctr417_SiceTAC_UNIDADTRANSPORTE", ({}, 0))[0]
+                        val = mapping.get(normalizar(row["carroceria"]))
+                        if val:
+                            from services.playwright_service import select_option_via_page_map
+                            if select_option_via_page_map(page, "#dnn_ctr417_SiceTAC_UNIDADTRANSPORTE", val):
+                                pass
+                            else:
+                                seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_UNIDADTRANSPORTE", row["carroceria"], selector_cache, normalizar, log_debug)
+                        else:
+                            seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_UNIDADTRANSPORTE", row["carroceria"], selector_cache, normalizar, log_debug)
+                    except Exception:
+                        seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_UNIDADTRANSPORTE", row["carroceria"], selector_cache, normalizar, log_debug)
 
                     try:
                         if not wait_for_significant_response(page, timeout_ms=1000):
@@ -225,7 +267,19 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE, job_meta_path=None):
                         if not option_exists(page, "#dnn_ctr417_SiceTAC_TIPOCARGA", row["tipo_carga"], selector_cache, normalizar, log_debug):
                             df_output.at[i, "resultado"] = f"No existe tipo_carga: {row['tipo_carga']}"
                             break
-                        seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_TIPOCARGA", row["tipo_carga"], selector_cache, normalizar, log_debug)
+                        try:
+                            mapping = selector_cache.get("#dnn_ctr417_SiceTAC_TIPOCARGA", ({}, 0))[0]
+                            val = mapping.get(normalizar(row["tipo_carga"]))
+                            if val:
+                                from services.playwright_service import select_option_via_page_map
+                                if select_option_via_page_map(page, "#dnn_ctr417_SiceTAC_TIPOCARGA", val):
+                                    pass
+                                else:
+                                    seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_TIPOCARGA", row["tipo_carga"], selector_cache, normalizar, log_debug)
+                            else:
+                                seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_TIPOCARGA", row["tipo_carga"], selector_cache, normalizar, log_debug)
+                        except Exception:
+                            seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_TIPOCARGA", row["tipo_carga"], selector_cache, normalizar, log_debug)
 
                     if not option_exists(page, "#dnn_ctr417_SiceTAC_ORIGEN", row["origen"], selector_cache, normalizar, log_debug):
                         df_output.at[i, "resultado"] = f"No existe origen: {row['origen']}"

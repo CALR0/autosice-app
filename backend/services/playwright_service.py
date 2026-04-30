@@ -128,6 +128,44 @@ def build_selector_map(page, selector, normalizar, log_debug=None):
         except Exception:
             pass
     return mapping, cnt
+
+
+def inject_selector_map(page, selector, mapping):
+    """Store a mapping object inside the page to allow fast client-side selects.
+
+    `mapping` should be a dict mapping normalized text -> option value.
+    """
+    try:
+        page.evaluate(
+            "(sel, map) => { window.__selmaps = window.__selmaps || {}; window.__selmaps[sel] = map; }",
+            selector,
+            mapping,
+        )
+    except Exception:
+        try:
+            # fallback: try to stringify small maps
+            page.evaluate("(sel, map) => { window.__selmaps = window.__selmaps || {}; window.__selmaps[sel] = map; }", selector, mapping)
+        except Exception:
+            pass
+
+
+def option_exists_via_page_map(page, selector, norm_key):
+    try:
+        return page.evaluate("(sel, key) => !!(window.__selmaps && window.__selmaps[sel] && window.__selmaps[sel][key])", selector, norm_key)
+    except Exception:
+        return False
+
+
+def select_option_via_page_map(page, selector, value):
+    """Set the select value via DOM and dispatch change event. Returns True if set."""
+    try:
+        return page.evaluate(
+            "(sel, val) => { const el = document.querySelector(sel); if(!el) return false; try{ el.value = val; el.dispatchEvent(new Event('change')); return true;}catch(e){ try{ el.selectedIndex = Array.from(el.options).findIndex(o => o.value==val); el.dispatchEvent(new Event('change')); return true;}catch(e){return false;} } }",
+            selector,
+            value,
+        )
+    except Exception:
+        return False
  
 
 def seleccionar_opcion(page, selector, valor_excel, selector_cache, normalizar, log_debug=None):
