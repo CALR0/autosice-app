@@ -229,6 +229,17 @@ def seleccionar_opcion(page, selector, valor_excel, selector_cache, normalizar, 
             selector_cache.pop("#dnn_ctr417_SiceTAC_DESTINO", None)
         return
 
+    # Debugging aid: log a sample of mapping keys when no match found
+    try:
+        if log_debug:
+            try:
+                sample_keys = list(mapping.keys())[:20]
+                log_debug(f"seleccionar_opcion: no match for '{valor_excel}' (norm='{valor_norm}'). sample keys={sample_keys}")
+            except Exception:
+                log_debug(f"seleccionar_opcion: no match for '{valor_excel}' (norm='{valor_norm}') and failed to list keys")
+    except Exception:
+        pass
+
     raise Exception(f"No se encontró opción para: {valor_excel}")
 
 
@@ -315,6 +326,16 @@ def option_exists(page, selector, valor_excel, selector_cache, normalizar, log_d
                 return True
         except Exception:
             continue
+    # If no match, log sample of keys for debugging
+    try:
+        if log_debug:
+            try:
+                sample_keys = list(mapping.keys())[:20]
+                log_debug(f"option_exists: no match for '{valor_excel}' (norm='{valor_norm}'). sample keys={sample_keys}")
+            except Exception:
+                log_debug(f"option_exists: no match for '{valor_excel}' (norm='{valor_norm}') and failed to list keys")
+    except Exception:
+        pass
 
     return False
 """Playwright helpers: browser/page lifecycle and common waits.
