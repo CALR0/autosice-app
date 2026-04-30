@@ -45,14 +45,45 @@ function App() {
   const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://127.0.0.1:5000';
   const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 
-  // Resume polling if a job was enqueued previously
+  // Resume polling if a job was enqueued previously — but only if it's still running
   useEffect(() => {
     const jid = localStorage.getItem('autosice_job_id');
-    if (jid) {
-      pollJob(jid);
-      setIsProcessing(true);
-      setStatus('Reanudando procesamiento...');
-    }
+    if (!jid) return;
+
+    const resumeIfRunning = async () => {
+      const statusUrl = `${API_URL}/job/${jid}/status`;
+      try {
+        const s = await fetch(statusUrl);
+        if (!s.ok) {
+          // job not found or endpoint error — cleanup
+          localStorage.removeItem('autosice_job_id');
+          return;
+        }
+        const meta = await s.json();
+
+        if (meta.status === 'queued' || meta.status === 'running') {
+          setIsProcessing(true);
+          setStatus('Reanudando procesamiento...');
+          pollJob(jid);
+        } else {
+          // job already finished or errored — show final state and cleanup
+          setRowsProcessed(meta.rows_processed ?? null);
+          setRowsErrors(meta.rows_errors ?? null);
+          setTotalRows(meta.total_rows ?? null);
+          if (meta.status === 'finished') {
+            setDownloadUrl(`${API_URL}/job/${jid}/download`);
+            setStatus('Archivo listo — pulsa Descargar');
+          } else if (meta.status === 'error') {
+            setStatus('Error: ' + (meta.error || 'Procesamiento falló'));
+          }
+          localStorage.removeItem('autosice_job_id');
+        }
+      } catch (err) {
+        localStorage.removeItem('autosice_job_id');
+      }
+    };
+
+    resumeIfRunning();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
