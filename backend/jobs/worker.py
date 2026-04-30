@@ -20,12 +20,38 @@ def start_job_worker(job_id: str, target_fn):
     def runner():
         save_job_meta(job_id, {"status": "running", "started_at": time.time()})
         try:
-            # target_fn is expected to write final meta or return counts
-            target_fn(inp, out, job_meta_path=meta)
-            # target_fn should update meta; ensure finished state if not
+            # target_fn is expected to write per-row meta and may return final counts
+            result = None
+            try:
+                result = target_fn(inp, out, job_meta_path=meta)
+            except TypeError:
+                # Some implementations may accept positional args only
+                result = target_fn(inp, out)
+
+            # If the processor returned counts, persist them as final meta.
+            final_meta = None
+            if isinstance(result, (list, tuple)) and len(result) >= 2:
+                try:
+                    processed_count = int(result[0])
+                    error_count = int(result[1])
+                    final_meta = {
+                        "status": "finished",
+                        "finished_at": time.time(),
+                        "rows_processed": processed_count,
+                        "rows_errors": error_count,
+                    }
+                    save_job_meta(job_id, final_meta)
+                except Exception:
+                    final_meta = None
+
+            # If processor didn't return final meta, ensure we at least set finished state
             m = load_meta_silent(meta)
             if not m or m.get('status') != 'finished':
-                save_job_meta(job_id, {"status": "finished", "finished_at": time.time()})
+                if final_meta is None:
+                    save_job_meta(job_id, {"status": "finished", "finished_at": time.time()})
+                else:
+                    # final_meta already saved
+                    pass
         except Exception as e:
             save_job_meta(job_id, {"status": "error", "error": str(e), "finished_at": time.time()})
 
