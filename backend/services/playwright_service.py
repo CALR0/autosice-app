@@ -284,7 +284,20 @@ def option_exists(page, selector, valor, selector_cache=None, normalizar=None, l
             except Exception:
                 snap = None
 
-            _safe_log(log_debug_fn, f"option_exists: selector={selector} value={valor} sample_keys={sample_keys} sample_values={sample_values} dom_snapshot={snap}")
+            # If dom_snapshot reports the select doesn't exist, capture a
+            # broader page-level diagnostic: list all <select> elements and
+            # their ids/names/text to understand why our selector failed.
+            try:
+                if snap and not snap.get('exists'):
+                    full_selects = page.evaluate(
+                        "() => { try{ const sels = Array.from(document.querySelectorAll('select')); return sels.slice(0,50).map(s=>({id:s.id||null,name:s.name||null,outer:s.outerHTML.slice(0,200)})); }catch(e){return null;} }"
+                    )
+                else:
+                    full_selects = None
+            except Exception:
+                full_selects = None
+
+            _safe_log(log_debug_fn, f"option_exists: selector={selector} value={valor} sample_keys={sample_keys} sample_values={sample_values} dom_snapshot={snap} all_selects={full_selects}")
         except Exception:
             pass
         return False
