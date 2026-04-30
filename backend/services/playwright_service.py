@@ -243,6 +243,29 @@ def option_exists(page, selector, valor, selector_cache=None, normalizar=None, l
         except Exception:
             pass
 
+        try:
+            # collect diagnostics for debugging
+            sample_keys = None
+            try:
+                if selector_cache and selector in selector_cache:
+                    sample_keys = list(selector_cache.get(selector, ({}, 0))[0].keys())[:10]
+            except Exception:
+                sample_keys = None
+            sample_values = None
+            try:
+                opts = page.query_selector_all(f"{selector} option")
+                sample_values = []
+                for o in opts[:10]:
+                    try:
+                        sample_values.append((o.get_attribute('value') or '', (o.inner_text() or '').strip()))
+                    except Exception:
+                        continue
+            except Exception:
+                sample_values = None
+
+            _safe_log(log_debug_fn, f"option_exists: selector={selector} value={valor} sample_keys={sample_keys} sample_values={sample_values}")
+        except Exception:
+            pass
         return False
     except Exception:
         return False
