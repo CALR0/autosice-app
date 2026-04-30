@@ -14,6 +14,8 @@ import threading
 
 from config import MAX_UPLOAD_BYTES
 from jobs.manager import job_dir as _job_dir, job_meta_path as _job_meta_path, job_input_path as _job_input_path, job_output_path as _job_output_path, save_job_meta, load_job_meta
+from utils.timing import log_debug
+import traceback
 
 bp = Blueprint('api_routes', __name__)
 
@@ -95,6 +97,7 @@ def procesar():
 
 @bp.route('/enqueue', methods=['POST'])
 def enqueue():
+    log_debug(f"enqueue called, content_length={request.content_length}")
     if request.content_length and request.content_length > MAX_UPLOAD_BYTES:
         return {"error": "file too large"}, 413
     file = request.files.get('file')
@@ -128,12 +131,20 @@ def enqueue():
 
     meta = {"status": "queued", "created_at": time.time(), "total_rows": total_rows, "rows_processed": 0, "rows_errors": 0}
     save_job_meta(job_id, meta)
+    try:
+        log_debug(f"enqueue: created job {job_id}, total_rows={total_rows}, input_size={inp.stat().st_size}")
+    except Exception:
+        log_debug(f"enqueue: created job {job_id}")
 
     try:
         from jobs.worker import start_job_worker
         import processors
+        log_debug(f"enqueue: starting job worker for {job_id} via processors.procesar_excel")
         start_job_worker(job_id, processors.procesar_excel)
+        log_debug(f"enqueue: worker started for {job_id}")
     except Exception:
+        log_debug(f"enqueue: primary worker start failed: {traceback.format_exc()}")
+
         def _fallback_runner(jid):
             meta = {"status": "running", "started_at": time.time(), "error": None}
             save_job_meta(jid, meta)
@@ -142,6 +153,7 @@ def enqueue():
                 inp = str(_job_input_path(jid))
                 out = str(_job_output_path(jid))
                 meta_path = str(_job_meta_path(jid))
+                log_debug(f"fallback runner: starting procesar_excel for {jid}")
                 processed, errors = procesar_excel(inp, out, job_meta_path=meta_path)
 
                 meta["status"] = "finished"
@@ -150,6 +162,7 @@ def enqueue():
                 meta["rows_errors"] = int(errors)
                 save_job_meta(jid, meta)
             except Exception as e:
+                log_debug(f"fallback runner: exception: {traceback.format_exc()}")
                 meta["status"] = "error"
                 meta["error"] = str(e)
                 meta["finished_at"] = time.time()

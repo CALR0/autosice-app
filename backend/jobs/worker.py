@@ -6,6 +6,8 @@ lightweight placeholder that other modules can call.
 import threading
 import time
 from .manager import job_input_path, job_output_path, job_meta_path, save_job_meta
+from utils.timing import log_debug
+import traceback
 
 
 def start_job_worker(job_id: str, target_fn):
@@ -19,14 +21,20 @@ def start_job_worker(job_id: str, target_fn):
 
     def runner():
         save_job_meta(job_id, {"status": "running", "started_at": time.time()})
+        log_debug(f"worker.runner: started runner thread for job {job_id}")
         try:
             # target_fn is expected to write per-row meta and may return final counts
             result = None
             try:
+                log_debug(f"worker.runner: calling target_fn for job {job_id}")
                 result = target_fn(inp, out, job_meta_path=meta)
             except TypeError:
                 # Some implementations may accept positional args only
-                result = target_fn(inp, out)
+                try:
+                    result = target_fn(inp, out)
+                except Exception:
+                    log_debug(f"worker.runner: target_fn raised in positional call: {traceback.format_exc()}")
+                    raise
 
             # If the processor returned counts, persist them as final meta.
             final_meta = None
@@ -44,6 +52,7 @@ def start_job_worker(job_id: str, target_fn):
                 except Exception:
                     final_meta = None
 
+            log_debug(f"worker.runner: target_fn completed for job {job_id}, result={result}")
             # If processor didn't return final meta, ensure we at least set finished state
             m = load_meta_silent(meta)
             if not m or m.get('status') != 'finished':
@@ -53,6 +62,7 @@ def start_job_worker(job_id: str, target_fn):
                     # final_meta already saved
                     pass
         except Exception as e:
+            log_debug(f"worker.runner: unhandled exception: {traceback.format_exc()}")
             save_job_meta(job_id, {"status": "error", "error": str(e), "finished_at": time.time()})
 
     t = threading.Thread(target=runner, daemon=True)
