@@ -143,6 +143,7 @@ function App() {
   };
 
   const handleUpload = async () => {
+    console.debug('handleUpload called', { API_URL, file });
     if (!file) {
       setStatus("Selecciona un archivo primero");
       return;
@@ -167,11 +168,13 @@ function App() {
 
     try {
       // Use async enqueue so we can show per-row progress
+      console.debug('Starting fetch to enqueue', `${API_URL}/enqueue`);
       const response = await fetch(`${API_URL}/enqueue`, {
         method: "POST",
         body: formData,
       });
 
+      console.debug('Fetch complete', { ok: response.ok, status: response.status });
       if (!response.ok) {
         const errText = await response.text().catch(() => null);
         throw new Error(errText || "Error en el servidor");
