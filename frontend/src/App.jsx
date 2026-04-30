@@ -183,11 +183,11 @@ function App() {
       try { localStorage.setItem('autosice_job_id', job_id); } catch (e) {}
 
       // use returned total_rows to show 'de X' immediately
-      if (typeof data.total_rows === 'number') {
+      if (data.total_rows !== null && typeof data.total_rows === 'number') {
         setTotalRows(data.total_rows);
+        // only set currentRow if we have totalRows so UI shows 'Procesando fila 1 de X'
+        setCurrentRow(1);
       }
-      // immediately set currentRow to 1 so UI shows "Procesando fila 1 de X"
-      setCurrentRow(1);
 
       const statusUrl = `${API_URL}${data.status_url}`;
       const downloadEndpoint = `${API_URL}${data.download_url}`;

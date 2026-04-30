@@ -41,8 +41,8 @@ export default function UploadCard({ file, setFile, handleUpload, status, rowsPr
         </div>
       </div>
       {/* Show live processing row while job is running */}
-      {typeof currentRow === 'number' ? (
-        <p className="processing-row fade-in stagger-5">Procesando fila {currentRow}{typeof totalRows === 'number' ? ` de ${totalRows}` : ''}…</p>
+      {typeof currentRow === 'number' && typeof totalRows === 'number' ? (
+        <p className="processing-row fade-in stagger-5">Procesando fila {currentRow} de {totalRows}…</p>
       ) : (
         <>
           {rowsProcessed !== null && (
