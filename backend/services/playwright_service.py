@@ -86,7 +86,37 @@ def build_selector_map(page, selector, normalizar, log_debug=None):
     mapping = {}
     for it in items:
         try:
-            mapping[normalizar(it.get('t', ''))] = it.get('v', '')
+            raw_text = it.get('t', '')
+            opt_val = it.get('v', '')
+            norm_full = normalizar(raw_text)
+            # primary key: full normalized text
+            if norm_full and norm_full not in mapping:
+                mapping[norm_full] = opt_val
+
+            # also index on first segment before dash/comma/paren to match 'Madrid - Cundinamarca' -> 'Madrid'
+            try:
+                import re as _re
+                first_seg = _re.split(r'[-,/()]+', raw_text)[0]
+                norm_first = normalizar(first_seg)
+                if norm_first and norm_first not in mapping:
+                    mapping[norm_first] = opt_val
+            except Exception:
+                pass
+
+            # index on individual tokens (words) to match partial inputs like 'bogot' or 'bogota'
+            try:
+                for tok in norm_full.split():
+                    if len(tok) > 2 and tok not in mapping:
+                        mapping[tok] = opt_val
+            except Exception:
+                pass
+            # also add variant stripping common abbreviations like 'd c' or 'dc'
+            try:
+                stripped = _re.sub(r"\b(d\.?\s*c\.?|dc)\b", "", norm_full).strip()
+                if stripped and stripped not in mapping:
+                    mapping[stripped] = opt_val
+            except Exception:
+                pass
         except Exception:
             continue
     cnt = len(items)
