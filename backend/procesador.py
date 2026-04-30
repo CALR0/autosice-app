@@ -9,7 +9,7 @@ import unicodedata
 import os
 
 
-def procesar_excel(INPUT_FILE, OUTPUT_FILE):
+def procesar_excel(INPUT_FILE, OUTPUT_FILE, job_meta_path=None):
 
     # ============================================================
     # CONFIGURACIÓN
@@ -485,6 +485,31 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE):
             except Exception:
                 # On any write failure, ignore to avoid crashing processing loop; final save will attempt to persist results.
                 pass
+
+            # If a job_meta_path was provided, update progress metadata per-row.
+            if job_meta_path:
+                try:
+                    # Compute processed and error counts so far
+                    success_mask = df_output.get("resultado", "") == "Completado con éxito"
+                    processed_count_partial = int(df_output[success_mask].shape[0])
+                    total_rows_partial = int(df_output.shape[0])
+                    error_count_partial = int(total_rows_partial - processed_count_partial)
+                    meta = {"status": "running", "rows_processed": processed_count_partial, "rows_errors": error_count_partial, "total_rows": total_rows_partial}
+                    # atomic write
+                    tmp = job_meta_path + ".tmp"
+                    with open(tmp, "w", encoding="utf-8") as mf:
+                        import json
+                        json.dump(meta, mf)
+                    try:
+                        os.replace(tmp, job_meta_path)
+                    except Exception:
+                        try:
+                            os.remove(job_meta_path)
+                            os.replace(tmp, job_meta_path)
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
 
             time.sleep(WAIT_TIME)
 

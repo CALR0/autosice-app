@@ -97,7 +97,9 @@ def _process_job_async(job_id: str):
 
         inp = str(_job_input_path(job_id))
         out = str(_job_output_path(job_id))
-        processed, errors = procesar_excel(inp, out)
+        meta_path = str(_job_meta_path(job_id))
+        # Pass meta_path so the processor can update progress per-row
+        processed, errors = procesar_excel(inp, out, job_meta_path=meta_path)
 
         meta["status"] = "finished"
         meta["finished_at"] = time.time()
