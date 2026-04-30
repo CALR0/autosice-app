@@ -92,11 +92,41 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE, job_meta_path=None):
                                 pass
                         except Exception:
                             selector_cache[sel] = (mapping, cnt)
-                        log_debug(f"prebuilt selector: {sel}")
+                            log_debug(f"prebuilt selector: {sel}")
                     except Exception as e:
                         log_debug(f"prebuild failed for {sel}: {e}")
             except Exception:
                 pass
+
+        # Always prebuild small, frequently-used selectors to avoid rebuilding them per-row.
+        try:
+            small_selectors = [
+                "#dnn_ctr417_SiceTAC_CONFIGURACION",
+                "#dnn_ctr417_SiceTAC_CONDICIONCARGA",
+                "#dnn_ctr417_SiceTAC_UNIDADTRANSPORTE",
+                "#dnn_ctr417_SiceTAC_TIPOCARGA",
+            ]
+            for sel in small_selectors:
+                try:
+                    if sel not in selector_cache:
+                        mapping, cnt = build_selector_map(page, sel, normalizar, log_debug)
+                        # insert with LRU eviction
+                        try:
+                            if sel in selector_cache:
+                                del selector_cache[sel]
+                        except Exception:
+                            pass
+                        selector_cache[sel] = (mapping, cnt)
+                        try:
+                            while len(selector_cache) > 8:
+                                selector_cache.popitem(last=False)
+                        except Exception:
+                            pass
+                        log_debug(f"prebuilt selector: {sel}")
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
         for i, row in df_output.iterrows():
 
@@ -149,11 +179,11 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE, job_meta_path=None):
                             break
 
                         try:
-                            if not wait_for_significant_response(page, timeout_ms=8000):
-                                esperar_postback(page, WAIT_TIME, FAST_PROCESSING)
+                            if not wait_for_significant_response(page, timeout_ms=1000):
+                                esperar_postback(page, min(WAIT_TIME, 0.5), FAST_PROCESSING)
                         except Exception:
                             try:
-                                esperar_postback(page, WAIT_TIME, FAST_PROCESSING)
+                                esperar_postback(page, min(WAIT_TIME, 0.5), FAST_PROCESSING)
                             except Exception:
                                 pass
                         log_debug(f"row {i}: config selected elapsed={time.time()-row_t0:.3f}s")
@@ -164,11 +194,11 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE, job_meta_path=None):
                     seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_CONDICIONCARGA", row["condicion"], selector_cache, normalizar, log_debug)
 
                     try:
-                        if not wait_for_significant_response(page, timeout_ms=8000):
-                            esperar_postback(page, WAIT_TIME, FAST_PROCESSING)
+                        if not wait_for_significant_response(page, timeout_ms=1000):
+                            esperar_postback(page, min(WAIT_TIME, 0.5), FAST_PROCESSING)
                     except Exception:
                         try:
-                            esperar_postback(page, WAIT_TIME, FAST_PROCESSING)
+                            esperar_postback(page, min(WAIT_TIME, 0.5), FAST_PROCESSING)
                         except Exception:
                             pass
                     log_debug(f"row {i}: condicion selected elapsed={time.time()-row_t0:.3f}s")
@@ -179,11 +209,11 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE, job_meta_path=None):
                     seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_UNIDADTRANSPORTE", row["carroceria"], selector_cache, normalizar, log_debug)
 
                     try:
-                        if not wait_for_significant_response(page, timeout_ms=8000):
-                            esperar_postback(page, WAIT_TIME, FAST_PROCESSING)
+                        if not wait_for_significant_response(page, timeout_ms=1000):
+                            esperar_postback(page, min(WAIT_TIME, 0.5), FAST_PROCESSING)
                     except Exception:
                         try:
-                            esperar_postback(page, WAIT_TIME, FAST_PROCESSING)
+                            esperar_postback(page, min(WAIT_TIME, 0.5), FAST_PROCESSING)
                         except Exception:
                             pass
                     log_debug(f"row {i}: carroceria selected elapsed={time.time()-row_t0:.3f}s")
