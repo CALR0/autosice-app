@@ -28,6 +28,7 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE, job_meta_path=None):
         esperar_postback,
         wait_for_significant_response,
         build_selector_map,
+        inject_selector_map,
         seleccionar_opcion,
         option_exists,
     )
@@ -213,7 +214,43 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE, job_meta_path=None):
                     except Exception:
                         pass
 
-                    if not option_exists(page, "#dnn_ctr417_SiceTAC_CONDICIONCARGA", row["condicion"], selector_cache, normalizar, log_debug):
+                    # The 'condicion' select may be created/updated after selecting
+                    # the configuration. Retry a few times and rebuild the selector
+                    # map after waiting to avoid false negatives when the element
+                    # is not yet present in the DOM.
+                    cond_sel = "#dnn_ctr417_SiceTAC_CONDICIONCARGA"
+                    cond_found = False
+                    for attempt in range(3):
+                        try:
+                            if option_exists(page, cond_sel, row["condicion"], selector_cache, normalizar, log_debug):
+                                cond_found = True
+                                break
+                        except Exception:
+                            pass
+
+                        # wait a bit for the server to update the select
+                        try:
+                            esperar_select(page, cond_sel, timeout=1.5 + attempt * 1.5)
+                        except Exception:
+                            pass
+
+                        # refresh cached map for this selector in case options changed
+                        try:
+                            mapping, cnt = build_selector_map(page, cond_sel, normalizar, log_debug)
+                            try:
+                                if cond_sel in selector_cache:
+                                    del selector_cache[cond_sel]
+                            except Exception:
+                                pass
+                            selector_cache[cond_sel] = (mapping, cnt)
+                            try:
+                                inject_selector_map(page, cond_sel, mapping)
+                            except Exception:
+                                pass
+                        except Exception:
+                            pass
+
+                    if not cond_found:
                         df_output.at[i, "resultado"] = f"No existe condicion: {row['condicion']}"
                         break
                     try:
