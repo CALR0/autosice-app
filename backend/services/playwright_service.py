@@ -203,6 +203,18 @@ def option_exists(page, selector, valor, selector_cache=None, normalizar=None, l
         except Exception:
             pass
 
+        # 1.b) JS-side direct value match (some inputs are the option.value)
+        try:
+            js_val_match = page.evaluate(
+                "(sel, target) => { const el = document.querySelector(sel); if(!el) return false; const t = (target||'').toString().toLowerCase().trim(); for(const o of (el.options||[])){ if((o.value||'').toString().toLowerCase().trim()===t) return true; } return false; }",
+                selector,
+                valor,
+            )
+            if js_val_match:
+                return True
+        except Exception:
+            pass
+
         # 2) cached mapping
         if selector_cache and selector in selector_cache:
             try:

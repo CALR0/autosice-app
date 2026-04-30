@@ -205,6 +205,13 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE, job_meta_path=None):
                             except Exception:
                                 pass
                         log_debug(f"row {i}: config selected elapsed={time.time()-row_t0:.3f}s")
+                    # After selecting configuration, the 'condicion' select may be
+                    # created/updated by a postback. Wait briefly for it to exist
+                    # before checking/using it.
+                    try:
+                        esperar_select(page, "#dnn_ctr417_SiceTAC_CONDICIONCARGA", timeout=2.0)
+                    except Exception:
+                        pass
 
                     if not option_exists(page, "#dnn_ctr417_SiceTAC_CONDICIONCARGA", row["condicion"], selector_cache, normalizar, log_debug):
                         df_output.at[i, "resultado"] = f"No existe condicion: {row['condicion']}"
