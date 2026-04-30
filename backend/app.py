@@ -260,7 +260,7 @@ def enqueue():
     t = threading.Thread(target=_process_job_async, args=(job_id,), daemon=True)
     t.start()
 
-    return {"job_id": job_id, "status_url": f"/job/{job_id}/status", "download_url": f"/job/{job_id}/download"}, 202
+    return {"job_id": job_id, "status_url": f"/job/{job_id}/status", "download_url": f"/job/{job_id}/download", "total_rows": total_rows}, 202
 
 
 @app.route("/job/<job_id>/status", methods=["GET"])

@@ -182,6 +182,13 @@ function App() {
       // persist job id so page reloads can resume polling
       try { localStorage.setItem('autosice_job_id', job_id); } catch (e) {}
 
+      // use returned total_rows to show 'de X' immediately
+      if (typeof data.total_rows === 'number') {
+        setTotalRows(data.total_rows);
+      }
+      // immediately set currentRow to 1 so UI shows "Procesando fila 1 de X"
+      setCurrentRow(1);
+
       const statusUrl = `${API_URL}${data.status_url}`;
       const downloadEndpoint = `${API_URL}${data.download_url}`;
 
