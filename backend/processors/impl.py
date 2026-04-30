@@ -274,11 +274,21 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE, job_meta_path=None):
 
             if job_meta_path:
                 try:
-                    success_mask = df_output.get("resultado", "") == "Completado con éxito"
-                    processed_count_partial = int(df_output[success_mask].shape[0])
+                    # Only count rows that have been attempted (non-empty `resultado`).
                     total_rows_partial = int(df_output.shape[0])
-                    error_count_partial = int(total_rows_partial - processed_count_partial)
-                    meta = {"status": "running", "rows_processed": processed_count_partial, "rows_errors": error_count_partial, "total_rows": total_rows_partial}
+                    results_col = df_output.get("resultado", "")
+                    attempted_mask = (results_col != "")
+                    attempted_count = int(df_output[attempted_mask].shape[0])
+                    success_mask = (results_col == "Completado con éxito")
+                    processed_count_partial = int(df_output[success_mask].shape[0])
+                    error_count_partial = int(attempted_count - processed_count_partial)
+                    meta = {
+                        "status": "running",
+                        "rows_processed": processed_count_partial,
+                        "rows_errors": error_count_partial,
+                        "total_rows": total_rows_partial,
+                        "rows_attempted": attempted_count,
+                    }
                     try:
                         try:
                             log_debug(f"writing job meta to {job_meta_path}: {meta}")
