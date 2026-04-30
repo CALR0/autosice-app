@@ -263,7 +263,16 @@ def option_exists(page, selector, valor, selector_cache=None, normalizar=None, l
             except Exception:
                 sample_values = None
 
-            _safe_log(log_debug_fn, f"option_exists: selector={selector} value={valor} sample_keys={sample_keys} sample_values={sample_values}")
+            # Also capture a JS-side snapshot: existence and first options
+            try:
+                snap = page.evaluate(
+                    "(sel) => { const el = document.querySelector(sel); if(!el) return {exists: false}; const opts = Array.from(el.options||[]).map(o=>({v: o.value, t: (o.innerText||o.text||'').toString().trim()})); return {exists:true, count: opts.length, sample: opts.slice(0,10)} }",
+                    selector,
+                )
+            except Exception:
+                snap = None
+
+            _safe_log(log_debug_fn, f"option_exists: selector={selector} value={valor} sample_keys={sample_keys} sample_values={sample_values} dom_snapshot={snap}")
         except Exception:
             pass
         return False
