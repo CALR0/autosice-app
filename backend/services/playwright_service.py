@@ -183,7 +183,55 @@ def option_exists(page, selector, valor_excel, selector_cache, normalizar, log_d
     else:
         mapping = mapping_entry[0]
 
-    return valor_norm in mapping
+    # Direct key check
+    if valor_norm in mapping:
+        return True
+
+    # Check candidates derived from the input: first segment before separators,
+    # stripped variants (remove 'd c', 'dc'), and individual tokens.
+    try:
+        import re as _re
+        first_seg = _re.split(r'[-,/()]+', valor_excel)[0]
+        cand_first = normalizar(first_seg)
+    except Exception:
+        cand_first = None
+
+    try:
+        stripped = _re.sub(r"\b(d\.?\s*c\.?|dc)\b", "", valor_norm).strip()
+    except Exception:
+        stripped = None
+
+    # token-level check
+    tokens = [t for t in valor_norm.split() if len(t) > 1]
+
+    # If any candidate is present in mapping keys, consider it existing
+    candidates = [c for c in (cand_first, stripped) if c]
+    candidates.extend(tokens)
+
+    for cand in candidates:
+        if cand in mapping:
+            try:
+                if log_debug:
+                    log_debug(f"option_exists: matched candidate '{cand}' for input '{valor_excel}'")
+            except Exception:
+                pass
+            return True
+
+    # Last resort: check for substring relationships between normalized input
+    # and mapping keys (either direction)
+    for key in mapping.keys():
+        try:
+            if key in valor_norm or valor_norm in key:
+                try:
+                    if log_debug:
+                        log_debug(f"option_exists: substring match key='{key}' input='{valor_norm}'")
+                except Exception:
+                    pass
+                return True
+        except Exception:
+            continue
+
+    return False
 """Playwright helpers: browser/page lifecycle and common waits.
 
 This module will centralize Playwright setup (FAST_PROCESSING options,
