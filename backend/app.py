@@ -206,75 +206,75 @@ def procesar():
             return f"Error: {str(e)}", 500
 
 
-    @app.route("/enqueue", methods=["POST"])
-    def enqueue():
-        """Enqueue an uploaded file for background processing.
+@app.route("/enqueue", methods=["POST"])
+def enqueue():
+    """Enqueue an uploaded file for background processing.
 
-        Returns a job id immediately. Check status at `/job/<id>/status` and
-        download the result at `/job/<id>/download` when ready.
-        """
-        # quick content-length check
-        if request.content_length and request.content_length > MAX_UPLOAD_BYTES:
+    Returns a job id immediately. Check status at `/job/<id>/status` and
+    download the result at `/job/<id>/download` when ready.
+    """
+    # quick content-length check
+    if request.content_length and request.content_length > MAX_UPLOAD_BYTES:
+        return {"error": "file too large"}, 413
+
+    file = request.files.get("file")
+    if file is None:
+        return {"error": "no file uploaded"}, 400
+
+    filename = (file.filename or "").lower()
+    if not (filename.endswith('.xlsx') or filename.endswith('.xls')):
+        return {"error": "only Excel files are allowed (.xlsx, .xls)"}, 400
+
+    job_id = uuid.uuid4().hex
+    d = _job_dir(job_id)
+    d.mkdir(parents=True, exist_ok=True)
+    inp = _job_input_path(job_id)
+    file.save(str(inp))
+
+    # verify saved size and cleanup if too large
+    try:
+        if inp.exists() and inp.stat().st_size > MAX_UPLOAD_BYTES:
+            # remove job dir
+            try:
+                shutil.rmtree(str(d))
+            except Exception:
+                pass
             return {"error": "file too large"}, 413
+    except Exception:
+        pass
 
-        file = request.files.get("file")
-        if file is None:
-            return {"error": "no file uploaded"}, 400
-
-        filename = (file.filename or "").lower()
-        if not (filename.endswith('.xlsx') or filename.endswith('.xls')):
-            return {"error": "only Excel files are allowed (.xlsx, .xls)"}, 400
-
-        job_id = uuid.uuid4().hex
-        d = _job_dir(job_id)
-        d.mkdir(parents=True, exist_ok=True)
-        inp = _job_input_path(job_id)
-        file.save(str(inp))
-
-        # verify saved size and cleanup if too large
-        try:
-            if inp.exists() and inp.stat().st_size > MAX_UPLOAD_BYTES:
-                # remove job dir
-                try:
-                    shutil.rmtree(str(d))
-                except Exception:
-                    pass
-                return {"error": "file too large"}, 413
-        except Exception:
-            pass
-
-        # attempt to detect total rows for progress reporting
+    # attempt to detect total rows for progress reporting
+    total_rows = None
+    try:
+        import pandas as pd
+        df = pd.read_excel(str(inp))
+        total_rows = int(df.shape[0])
+    except Exception:
         total_rows = None
-        try:
-            import pandas as pd
-            df = pd.read_excel(str(inp))
-            total_rows = int(df.shape[0])
-        except Exception:
-            total_rows = None
 
-        meta = {"status": "queued", "created_at": time.time(), "total_rows": total_rows, "rows_processed": 0, "rows_errors": 0}
-        save_job_meta(job_id, meta)
+    meta = {"status": "queued", "created_at": time.time(), "total_rows": total_rows, "rows_processed": 0, "rows_errors": 0}
+    save_job_meta(job_id, meta)
 
-        t = threading.Thread(target=_process_job_async, args=(job_id,), daemon=True)
-        t.start()
+    t = threading.Thread(target=_process_job_async, args=(job_id,), daemon=True)
+    t.start()
 
-        return {"job_id": job_id, "status_url": f"/job/{job_id}/status", "download_url": f"/job/{job_id}/download"}, 202
+    return {"job_id": job_id, "status_url": f"/job/{job_id}/status", "download_url": f"/job/{job_id}/download"}, 202
 
 
-    @app.route("/job/<job_id>/status", methods=["GET"])
-    def job_status(job_id):
-        meta = load_job_meta(job_id)
-        if not meta:
-            return {"error": "job not found"}, 404
-        return meta
+@app.route("/job/<job_id>/status", methods=["GET"])
+def job_status(job_id):
+    meta = load_job_meta(job_id)
+    if not meta:
+        return {"error": "job not found"}, 404
+    return meta
 
 
-    @app.route("/job/<job_id>/download", methods=["GET"])
-    def job_download(job_id):
-        out = _job_output_path(job_id)
-        if not out.exists():
-            return {"error": "result not ready"}, 404
-        return send_file(str(out), as_attachment=True, download_name=f"resultado_{job_id}.xlsx")
+@app.route("/job/<job_id>/download", methods=["GET"])
+def job_download(job_id):
+    out = _job_output_path(job_id)
+    if not out.exists():
+        return {"error": "result not ready"}, 404
+    return send_file(str(out), as_attachment=True, download_name=f"resultado_{job_id}.xlsx")
 
 
 @app.route("/health", methods=["GET"])
