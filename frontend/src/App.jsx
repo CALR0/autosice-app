@@ -8,7 +8,7 @@ import Hero from "./components/Hero";
 import UploadCard from "./components/UploadCard";
 import ExampleTable from "./components/ExampleTable";
 
-function Home({file, setFile, handleUpload, status, rowsProcessed, rowsErrors, processingStatus, downloadUrl, onDownload, isProcessing}){
+function Home({file, setFile, handleUpload, status, rowsProcessed, rowsErrors, processingStatus, downloadUrl, onDownload, isProcessing, currentRow, totalRows}){
   return (
     <>
       <Hero />
@@ -24,6 +24,8 @@ function Home({file, setFile, handleUpload, status, rowsProcessed, rowsErrors, p
         downloadUrl={downloadUrl}
         onDownload={onDownload}
         isProcessing={isProcessing}
+        currentRow={currentRow}
+        totalRows={totalRows}
       />
 
       <ExampleTable />
