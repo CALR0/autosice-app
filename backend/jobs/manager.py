@@ -7,6 +7,7 @@ from pathlib import Path
 import json
 import os
 import time
+from utils.timing import log_debug
 
 
 JOBS_DIR = Path(os.getenv('JOBS_DIR', './jobs')).resolve()
@@ -49,16 +50,31 @@ def save_job_meta(job_id: str, meta: dict):
 def save_job_meta_path(path: str, meta: dict):
     """Save meta to an explicit file path using atomic replace semantics."""
     tmp = str(path) + '.tmp'
-    with open(tmp, 'w', encoding='utf-8') as f:
-        json.dump(meta, f)
     try:
+        with open(tmp, 'w', encoding='utf-8') as f:
+            json.dump(meta, f)
+            try:
+                f.flush()
+            except Exception:
+                pass
+            try:
+                os.fsync(f.fileno())
+            except Exception:
+                pass
         os.replace(tmp, str(path))
+        try:
+            log_debug(f"save_job_meta_path: wrote meta to {path}")
+        except Exception:
+            pass
     except Exception:
         try:
             os.remove(str(path))
             os.replace(tmp, str(path))
         except Exception:
-            pass
+            try:
+                log_debug(f"save_job_meta_path: failed to write meta to {path}")
+            except Exception:
+                pass
 
 
 def load_job_meta(job_id: str):

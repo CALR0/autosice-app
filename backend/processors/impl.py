@@ -126,8 +126,8 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE, job_meta_path=None):
                         except Exception:
                             pass
                     if not found_conf:
-                        if option_exists(page, "#dnn_ctr417_SiceTAC_CONFIGURACION", row["configuracion"]):
-                            seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_CONFIGURACION", row["configuracion"])
+                        if option_exists(page, "#dnn_ctr417_SiceTAC_CONFIGURACION", row["configuracion"], selector_cache, normalizar, log_debug):
+                            seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_CONFIGURACION", row["configuracion"], selector_cache, normalizar, log_debug)
                             found_conf = True
                         else:
                             df_output.at[i, "resultado"] = f"No existe configuracion: {row['configuracion']}"
@@ -143,10 +143,10 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE, job_meta_path=None):
                                 pass
                         log_debug(f"row {i}: config selected elapsed={time.time()-row_t0:.3f}s")
 
-                    if not option_exists(page, "#dnn_ctr417_SiceTAC_CONDICIONCARGA", row["condicion"]):
+                    if not option_exists(page, "#dnn_ctr417_SiceTAC_CONDICIONCARGA", row["condicion"], selector_cache, normalizar, log_debug):
                         df_output.at[i, "resultado"] = f"No existe condicion: {row['condicion']}"
                         break
-                    seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_CONDICIONCARGA", row["condicion"])
+                    seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_CONDICIONCARGA", row["condicion"], selector_cache, normalizar, log_debug)
 
                     try:
                         if not wait_for_significant_response(page, timeout_ms=8000):
@@ -158,10 +158,10 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE, job_meta_path=None):
                             pass
                     log_debug(f"row {i}: condicion selected elapsed={time.time()-row_t0:.3f}s")
 
-                    if not option_exists(page, "#dnn_ctr417_SiceTAC_UNIDADTRANSPORTE", row["carroceria"]):
+                    if not option_exists(page, "#dnn_ctr417_SiceTAC_UNIDADTRANSPORTE", row["carroceria"], selector_cache, normalizar, log_debug):
                         df_output.at[i, "resultado"] = f"No existe unidad transporte (carroceria): {row['carroceria']}"
                         break
-                    seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_UNIDADTRANSPORTE", row["carroceria"])
+                    seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_UNIDADTRANSPORTE", row["carroceria"], selector_cache, normalizar, log_debug)
 
                     try:
                         if not wait_for_significant_response(page, timeout_ms=8000):
@@ -177,23 +177,23 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE, job_meta_path=None):
 
 
                     if condicion != "vacio" and pd.notna(row["tipo_carga"]):
-                        if not option_exists(page, "#dnn_ctr417_SiceTAC_TIPOCARGA", row["tipo_carga"]):
+                        if not option_exists(page, "#dnn_ctr417_SiceTAC_TIPOCARGA", row["tipo_carga"], selector_cache, normalizar, log_debug):
                             df_output.at[i, "resultado"] = f"No existe tipo_carga: {row['tipo_carga']}"
                             break
-                        seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_TIPOCARGA", row["tipo_carga"])
+                        seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_TIPOCARGA", row["tipo_carga"], selector_cache, normalizar, log_debug)
 
-                    if not option_exists(page, "#dnn_ctr417_SiceTAC_ORIGEN", row["origen"]):
+                    if not option_exists(page, "#dnn_ctr417_SiceTAC_ORIGEN", row["origen"], selector_cache, normalizar, log_debug):
                         df_output.at[i, "resultado"] = f"No existe origen: {row['origen']}"
                         break
-                    seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_ORIGEN", row["origen"])
+                    seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_ORIGEN", row["origen"], selector_cache, normalizar, log_debug)
 
                     esperar_select(page, "#dnn_ctr417_SiceTAC_DESTINO")
                     log_debug(f"row {i}: origen selected elapsed={time.time()-row_t0:.3f}s")
 
-                    if not option_exists(page, "#dnn_ctr417_SiceTAC_DESTINO", row["destino"]):
+                    if not option_exists(page, "#dnn_ctr417_SiceTAC_DESTINO", row["destino"], selector_cache, normalizar, log_debug):
                         df_output.at[i, "resultado"] = f"No existe destino: {row['destino']}"
                         break
-                    seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_DESTINO", row["destino"])
+                    seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_DESTINO", row["destino"], selector_cache, normalizar, log_debug)
 
                     log_debug(f"row {i}: destino selected elapsed={time.time()-row_t0:.3f}s")
 
@@ -280,9 +280,20 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE, job_meta_path=None):
                     error_count_partial = int(total_rows_partial - processed_count_partial)
                     meta = {"status": "running", "rows_processed": processed_count_partial, "rows_errors": error_count_partial, "total_rows": total_rows_partial}
                     try:
+                        try:
+                            log_debug(f"writing job meta to {job_meta_path}: {meta}")
+                        except Exception:
+                            pass
                         save_job_meta_path(job_meta_path, meta)
+                        try:
+                            log_debug(f"wrote job meta to {job_meta_path}")
+                        except Exception:
+                            pass
                     except Exception:
-                        pass
+                        try:
+                            log_debug(f"failed writing job meta to {job_meta_path}")
+                        except Exception:
+                            pass
                 except Exception:
                     pass
 
