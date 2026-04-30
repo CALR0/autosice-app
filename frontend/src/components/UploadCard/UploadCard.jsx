@@ -1,7 +1,7 @@
 import React from 'react';
 import './UploadCard.css';
 
-export default function UploadCard({ file, setFile, handleUpload, status, rowsProcessed, rowsErrors, processingStatus, downloadUrl, onDownload, isProcessing }) {
+export default function UploadCard({ file, setFile, handleUpload, status, rowsProcessed, rowsErrors, processingStatus, downloadUrl, onDownload, isProcessing, currentRow, totalRows }) {
   return (
     <div className="app-container fade-in stagger-3">
       <div className="upload-box">
@@ -40,16 +40,19 @@ export default function UploadCard({ file, setFile, handleUpload, status, rowsPr
           ) : null}
         </div>
       </div>
-      {rowsProcessed !== null && (
-        <p className="processed-count fade-in stagger-5">Filas procesadas con éxito: {rowsProcessed}</p>
-      )}
+      {/* Show live processing row while job is running */}
+      {currentRow !== null ? (
+        <p className="processing-row fade-in stagger-5">Procesando fila {currentRow}{totalRows ? ` de ${totalRows}` : ''}…</p>
+      ) : (
+        <>
+          {rowsProcessed !== null && (
+            <p className="processed-count fade-in stagger-5">Filas procesadas con éxito: {rowsProcessed}</p>
+          )}
 
-      {rowsErrors !== null && rowsErrors > 0 && (
-        <p className="processed-error fade-in stagger-6">Errores: {rowsErrors} — revisa la columna `resultado` en el archivo de salida.</p>
-      )}
-
-      {processingStatus && processingStatus !== 'completed' && (
-        <p className="processed-status fade-in stagger-6">Estado: {processingStatus}</p>
+          {rowsErrors !== null && rowsErrors > 0 && (
+            <p className="processed-error fade-in stagger-6">Errores: {rowsErrors} — revisa la columna `resultado` en el archivo de salida.</p>
+          )}
+        </>
       )}
     </div>
   );

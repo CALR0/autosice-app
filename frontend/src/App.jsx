@@ -37,6 +37,8 @@ function App() {
   const [rowsProcessed, setRowsProcessed] = useState(null);
   const [rowsErrors, setRowsErrors] = useState(null);
   const [processingStatus, setProcessingStatus] = useState(null);
+  const [currentRow, setCurrentRow] = useState(null);
+  const [totalRows, setTotalRows] = useState(null);
   const [downloadUrl, setDownloadUrl] = useState(null);
   const [downloadName, setDownloadName] = useState('resultado.xlsx');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -91,10 +93,14 @@ function App() {
 
           setRowsProcessed(meta.rows_processed ?? null);
           setRowsErrors(meta.rows_errors ?? null);
-          // show processing status only while queued/running
+          setTotalRows(meta.total_rows ?? null);
+          // update current row (1-based) while running
           if (meta.status === 'queued' || meta.status === 'running') {
-            setProcessingStatus(meta.status);
+            const current = (meta.rows_processed || 0) + 1;
+            setCurrentRow(current);
+            setProcessingStatus(null);
           } else {
+            setCurrentRow(null);
             setProcessingStatus(null);
           }
 
@@ -114,6 +120,7 @@ function App() {
             setDownloadUrl(downloadEndpoint);
             setIsProcessing(false);
             setProcessingStatus(null);
+            setCurrentRow(null);
             return;
           }
 
@@ -121,6 +128,7 @@ function App() {
             setStatus('Error: ' + (meta.error || 'Procesamiento falló'));
             setIsProcessing(false);
             setProcessingStatus(null);
+            setCurrentRow(null);
             return;
           }
         } catch (err) {
@@ -155,7 +163,7 @@ function App() {
         <TitleUpdater />
         <div className="page-inner">
           <Routes>
-            <Route path="/" element={<Home file={file} setFile={setFile} handleUpload={handleUpload} status={status} rowsProcessed={rowsProcessed} rowsErrors={rowsErrors} processingStatus={processingStatus} downloadUrl={downloadUrl} onDownload={handleDownload} isProcessing={isProcessing} />} />
+            <Route path="/" element={<Home file={file} setFile={setFile} handleUpload={handleUpload} status={status} rowsProcessed={rowsProcessed} rowsErrors={rowsErrors} processingStatus={processingStatus} downloadUrl={downloadUrl} onDownload={handleDownload} isProcessing={isProcessing} currentRow={currentRow} totalRows={totalRows} />} />
             <Route path="/faq" element={<FAQ />} />
             {/* future routes can be added here */}
           </Routes>
