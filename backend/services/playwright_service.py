@@ -213,7 +213,22 @@ def option_exists(page, selector, valor, selector_cache=None, normalizar=None, l
             except Exception:
                 pass
 
-        # 3) Python-side brute force: inspect DOM options
+        # 3) Try matching option.value directly (some sheets provide the option value)
+        try:
+            opts = page.query_selector_all(f"{selector} option")
+            vnorm = (valor or '').strip()
+            if vnorm:
+                for o in opts:
+                    try:
+                        ov = (o.get_attribute('value') or '').strip()
+                        if ov and ov.lower() == vnorm.lower():
+                            return True
+                    except Exception:
+                        continue
+        except Exception:
+            pass
+
+        # 4) Python-side brute force: inspect DOM options by visible text
         try:
             opts = page.query_selector_all(f"{selector} option")
             k = normalizar(valor) if normalizar else (valor or '').lower().strip()
@@ -259,6 +274,21 @@ def seleccionar_opcion(page, selector, valor_text, selector_cache=None, normaliz
                         return True
             except Exception:
                 pass
+
+        # 3) Attempt to match by option.value directly (some sheets give values)
+        try:
+            opts = page.query_selector_all(f"{selector} option")
+            vnorm = (valor_text or '').strip()
+            if vnorm:
+                for o in opts:
+                    try:
+                        ov = (o.get_attribute('value') or '').strip()
+                        if ov and ov.lower() == vnorm.lower():
+                            return select_option_via_page_map(page, selector, ov)
+                    except Exception:
+                        continue
+        except Exception:
+            pass
 
         # brute force
         try:
