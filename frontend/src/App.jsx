@@ -45,6 +45,70 @@ function App() {
   const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://127.0.0.1:5000';
   const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 
+  // Resume polling if a job was enqueued previously
+  useEffect(() => {
+    const jid = localStorage.getItem('autosice_job_id');
+    if (jid) {
+      pollJob(jid);
+      setIsProcessing(true);
+      setStatus('Reanudando procesamiento...');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Poll a job by id and update UI state. Keeps polling until finished/error.
+  const pollJob = async (job_id) => {
+    const statusUrl = `${API_URL}/job/${job_id}/status`;
+    const downloadEndpoint = `${API_URL}/job/${job_id}/download`;
+
+    const tick = async () => {
+      try {
+        const s = await fetch(statusUrl);
+        if (!s.ok) throw new Error('Status fetch failed');
+        const meta = await s.json();
+
+        setRowsProcessed(meta.rows_processed ?? null);
+        setRowsErrors(meta.rows_errors ?? null);
+        setTotalRows(meta.total_rows ?? null);
+
+        if (meta.status === 'queued' || meta.status === 'running') {
+          const current = (meta.rows_processed || 0) + 1;
+          setCurrentRow(current);
+          setProcessingStatus(null);
+          if (meta.total_rows) setStatus(`Procesando fila ${current} de ${meta.total_rows}`);
+          else setStatus(`Procesando fila ${current}`);
+          setTimeout(tick, 2000);
+          return;
+        }
+
+        if (meta.status === 'finished') {
+          setStatus('Archivo listo — pulsa Descargar');
+          setDownloadUrl(downloadEndpoint);
+          setIsProcessing(false);
+          setProcessingStatus(null);
+          setCurrentRow(null);
+          localStorage.removeItem('autosice_job_id');
+          return;
+        }
+
+        if (meta.status === 'error') {
+          setStatus('Error: ' + (meta.error || 'Procesamiento falló'));
+          setIsProcessing(false);
+          setProcessingStatus(null);
+          setCurrentRow(null);
+          localStorage.removeItem('autosice_job_id');
+          return;
+        }
+      } catch (err) {
+        setStatus('Error consultando estado: ' + (err.message || err));
+        setIsProcessing(false);
+        localStorage.removeItem('autosice_job_id');
+      }
+    };
+
+    tick();
+  };
+
   const handleUpload = async () => {
     if (!file) {
       setStatus("Selecciona un archivo primero");
@@ -81,6 +145,10 @@ function App() {
       }
 
       const data = await response.json();
+      const job_id = data.job_id;
+      // persist job id so page reloads can resume polling
+      try { localStorage.setItem('autosice_job_id', job_id); } catch (e) {}
+
       const statusUrl = `${API_URL}${data.status_url}`;
       const downloadEndpoint = `${API_URL}${data.download_url}`;
 
@@ -137,7 +205,8 @@ function App() {
         }
       };
 
-      poll();
+      // start polling via central function so reload/resume works
+      pollJob(job_id);
 
     } catch (error) {
       setStatus("Error: " + error.message);

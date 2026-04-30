@@ -112,6 +112,9 @@
 .upload-status, .status { margin-top: 12px; font-size: 13px; color: var(--muted); text-align:center; }
 .processed-count, .processed-error, .processed-status { font-size:13px; color:var(--muted); margin-top:8px; text-align:center; }
 
+/* processing-row should match the size/appearance of other processed text */
+.processing-row { font-size:13px; color:var(--muted); margin-top:8px; text-align:center; }
+
 @media (max-width:640px){
   .upload-controls, .actions { gap: 10px; }
   .primary-btn, .file-button { width: 100%; min-width: 0; height: 38px; font-size: 13px; }
