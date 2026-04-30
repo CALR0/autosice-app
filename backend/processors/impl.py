@@ -177,16 +177,16 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE, job_meta_path=None):
                             pass
                     if not found_conf:
                         if option_exists(page, "#dnn_ctr417_SiceTAC_CONFIGURACION", row["configuracion"], selector_cache, normalizar, log_debug):
-                            # try fast page-side select using prebuilt map
+                            # try fast JS-side exact normalized match first
                             try:
-                                mapping = selector_cache.get("#dnn_ctr417_SiceTAC_CONFIGURACION", ({}, 0))[0]
-                                val = mapping.get(normalizar(row["configuracion"]))
+                                from services.playwright_service import find_option_value_js, select_option_via_page_map
+                                val = find_option_value_js(page, "#dnn_ctr417_SiceTAC_CONFIGURACION", row["configuracion"])
                                 if val:
-                                    from services.playwright_service import select_option_via_page_map
                                     ok = select_option_via_page_map(page, "#dnn_ctr417_SiceTAC_CONFIGURACION", val)
                                     if ok:
                                         found_conf = True
                                 if not found_conf:
+                                    # fallback to Python-side selector helper
                                     seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_CONFIGURACION", row["configuracion"], selector_cache, normalizar, log_debug)
                                     found_conf = True
                             except Exception:
@@ -210,10 +210,9 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE, job_meta_path=None):
                         df_output.at[i, "resultado"] = f"No existe condicion: {row['condicion']}"
                         break
                     try:
-                        mapping = selector_cache.get("#dnn_ctr417_SiceTAC_CONDICIONCARGA", ({}, 0))[0]
-                        val = mapping.get(normalizar(row["condicion"]))
+                        from services.playwright_service import find_option_value_js, select_option_via_page_map
+                        val = find_option_value_js(page, "#dnn_ctr417_SiceTAC_CONDICIONCARGA", row["condicion"])
                         if val:
-                            from services.playwright_service import select_option_via_page_map
                             if select_option_via_page_map(page, "#dnn_ctr417_SiceTAC_CONDICIONCARGA", val):
                                 pass
                             else:
@@ -237,10 +236,9 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE, job_meta_path=None):
                         df_output.at[i, "resultado"] = f"No existe unidad transporte (carroceria): {row['carroceria']}"
                         break
                     try:
-                        mapping = selector_cache.get("#dnn_ctr417_SiceTAC_UNIDADTRANSPORTE", ({}, 0))[0]
-                        val = mapping.get(normalizar(row["carroceria"]))
+                        from services.playwright_service import find_option_value_js, select_option_via_page_map
+                        val = find_option_value_js(page, "#dnn_ctr417_SiceTAC_UNIDADTRANSPORTE", row["carroceria"])
                         if val:
-                            from services.playwright_service import select_option_via_page_map
                             if select_option_via_page_map(page, "#dnn_ctr417_SiceTAC_UNIDADTRANSPORTE", val):
                                 pass
                             else:
@@ -268,10 +266,9 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE, job_meta_path=None):
                             df_output.at[i, "resultado"] = f"No existe tipo_carga: {row['tipo_carga']}"
                             break
                         try:
-                            mapping = selector_cache.get("#dnn_ctr417_SiceTAC_TIPOCARGA", ({}, 0))[0]
-                            val = mapping.get(normalizar(row["tipo_carga"]))
+                            from services.playwright_service import find_option_value_js, select_option_via_page_map
+                            val = find_option_value_js(page, "#dnn_ctr417_SiceTAC_TIPOCARGA", row["tipo_carga"])
                             if val:
-                                from services.playwright_service import select_option_via_page_map
                                 if select_option_via_page_map(page, "#dnn_ctr417_SiceTAC_TIPOCARGA", val):
                                     pass
                                 else:
