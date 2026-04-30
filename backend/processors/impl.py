@@ -64,8 +64,115 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE, job_meta_path=None):
         browser = p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-setuid-sandbox"])
         page = browser.new_page()
 
+        # Helper: try to set a select's value using value, then label, then
+        # a JS normalized-text match. Returns True on success.
+        def try_set_select(selector, val_text):
+            try:
+                if val_text is None:
+                    return False
+                sval = str(val_text).strip()
+                if sval == "":
+                    return False
+                # wait briefly for the element to exist
+                try:
+                    page.wait_for_selector(selector, timeout=1500)
+                except Exception:
+                    pass
+
+                # 1) try by value
+                try:
+                    res = page.select_option(selector, value=sval)
+                    if res:
+                        try:
+                            page.evaluate("sel=>{const e=document.querySelector(sel); if(e) e.dispatchEvent(new Event('change',{bubbles:true}));}", selector)
+                        except Exception:
+                            pass
+                        return True
+                except Exception:
+                    pass
+
+                # 2) try by label (visible text)
+                try:
+                    res = page.select_option(selector, label=sval)
+                    if res:
+                        try:
+                            page.evaluate("sel=>{const e=document.querySelector(sel); if(e) e.dispatchEvent(new Event('change',{bubbles:true}));}", selector)
+                        except Exception:
+                            pass
+                        return True
+                except Exception:
+                    pass
+
+                # 3) try JS-side normalized full-text match to find option.value
+                try:
+                    found = page.evaluate(
+                        "(sel, target) => { function norm(s){ try{ return s.toString().toLowerCase().normalize('NFD').replace(/\\p{Diacritic}/gu,'').replace(/[^a-z0-9\\s]/g,'').replace(/\\s+/g,' ').trim(); }catch(e){return s.toString().toLowerCase().trim();} } const el = document.querySelector(sel); if(!el) return null; const t = norm(target||''); for(const o of (el.options||[])){ try{ if(norm(o.innerText||o.text||'')===t) return o.value;}catch(e){continue;} } return null }",
+                        selector,
+                        sval,
+                    )
+                    if found:
+                        try:
+                            page.select_option(selector, value=found)
+                        except Exception:
+                            try:
+                                page.evaluate("(sel,val)=>{const e=document.querySelector(sel); if(e){ e.value=val; e.dispatchEvent(new Event('change',{bubbles:true})); }}", selector, found)
+                            except Exception:
+                                pass
+                        return True
+                except Exception:
+                    pass
+
+                return False
+            except Exception:
+                return False
+
         from collections import OrderedDict
         selector_cache = OrderedDict()
+
+        # Allowed exact values and labels for strict selects. Accepts either
+        # the option `value` (preferred) or the visible label (case-insensitive).
+        ALLOWED_SELECTS = {
+            "#dnn_ctr417_SiceTAC_CONFIGURACION": {
+                "values": set([
+                    "2","2_7_8","2_8_9","2_9_105","2S2","2S3",
+                    "3","3S2","3S3","V2","V3","V4",
+                ]),
+                "labels": set(),
+            },
+            "#dnn_ctr417_SiceTAC_CONDICIONCARGA": {
+                "values": set(["1","2"]),
+                "labels": set(["CARGADO","VACIO"]),
+            },
+            "#dnn_ctr417_SiceTAC_UNIDADTRANSPORTE": {
+                "values": set(["1","10","2","60","48","231","1061","4"]),
+                "labels": set(["ESTACAS","ESTIBAS","FURGON","FURGON REFRIGERADO","PLATAFORMA","PORTACONTENEDORES","TANQUE","VOLCO"]),
+            },
+            "#dnn_ctr417_SiceTAC_TIPOCARGA": {
+                "values": set(["12","5"]),
+                "labels": set(["General","Granel Sólido"]),
+            },
+        }
+
+        def allowed_for_selector(sel, raw_val):
+            try:
+                if raw_val is None:
+                    return False
+                sval = str(raw_val).strip()
+                if sval == "":
+                    return False
+                cfg = ALLOWED_SELECTS.get(sel)
+                if not cfg:
+                    return True
+                if sval in cfg["values"]:
+                    return True
+                # case-insensitive label match
+                up = sval.upper()
+                for lab in cfg["labels"]:
+                    if up == lab.upper():
+                        return True
+                return False
+            except Exception:
+                return False
 
         if FAST_PROCESSING:
             setup_resource_blocking(page, FAST_PROCESSING)
@@ -165,37 +272,28 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE, job_meta_path=None):
             start_time = time.time()
             while True:
                 try:
-                    config_value = str(row["configuracion"]) if pd.notna(row["configuracion"]) else ""
-                    opciones_conf = page.locator("#dnn_ctr417_SiceTAC_CONFIGURACION option")
-                    found_conf = False
-                    for j in range(opciones_conf.count()):
+                    # Validate Excel-provided config value is one of allowed options
+                    config_sel = "#dnn_ctr417_SiceTAC_CONFIGURACION"
+                    if not allowed_for_selector(config_sel, row.get("configuracion")):
                         try:
-                            if opciones_conf.nth(j).get_attribute("value") == config_value:
-                                page.select_option("#dnn_ctr417_SiceTAC_CONFIGURACION", value=config_value)
-                                found_conf = True
-                                break
+                            log_debug(f"invalid configuracion value for row {i}: {row.get('configuracion')} allowed={ALLOWED_SELECTS.get(config_sel)}")
                         except Exception:
                             pass
+                        df_output.at[i, "resultado"] = f"Valor invalido para configuracion: {row.get('configuracion')}"
+                        break
+
+                    # Prefer direct selection by value/label using the Excel value.
+                    config_value = str(row["configuracion"]) if pd.notna(row["configuracion"]) else ""
+                    found_conf = False
+                    try:
+                        if try_set_select("#dnn_ctr417_SiceTAC_CONFIGURACION", config_value):
+                            found_conf = True
+                    except Exception:
+                        found_conf = False
+
                     if not found_conf:
-                        if option_exists(page, "#dnn_ctr417_SiceTAC_CONFIGURACION", row["configuracion"], selector_cache, normalizar, log_debug):
-                            # try fast JS-side exact normalized match first
-                            try:
-                                from services.playwright_service import find_option_value_js, select_option_via_page_map
-                                val = find_option_value_js(page, "#dnn_ctr417_SiceTAC_CONFIGURACION", row["configuracion"])
-                                if val:
-                                    ok = select_option_via_page_map(page, "#dnn_ctr417_SiceTAC_CONFIGURACION", val)
-                                    if ok:
-                                        found_conf = True
-                                if not found_conf:
-                                    # fallback to Python-side selector helper
-                                    seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_CONFIGURACION", row["configuracion"], selector_cache, normalizar, log_debug)
-                                    found_conf = True
-                            except Exception:
-                                seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_CONFIGURACION", row["configuracion"], selector_cache, normalizar, log_debug)
-                                found_conf = True
-                        else:
-                            df_output.at[i, "resultado"] = f"No existe configuracion: {row['configuracion']}"
-                            break
+                        df_output.at[i, "resultado"] = f"No existe configuracion: {row['configuracion']}"
+                        break
 
                         try:
                             if not wait_for_significant_response(page, timeout_ms=1000):
@@ -218,53 +316,32 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE, job_meta_path=None):
                     # the configuration. Retry a few times and rebuild the selector
                     # map after waiting to avoid false negatives when the element
                     # is not yet present in the DOM.
+                    # For 'condicion' prefer direct set by Excel value/label.
                     cond_sel = "#dnn_ctr417_SiceTAC_CONDICIONCARGA"
-                    cond_found = False
-                    for attempt in range(3):
+                    cond_val = row["condicion"]
+                    # validate condicion
+                    if not allowed_for_selector(cond_sel, cond_val):
                         try:
-                            if option_exists(page, cond_sel, row["condicion"], selector_cache, normalizar, log_debug):
-                                cond_found = True
-                                break
+                            log_debug(f"invalid condicion value for row {i}: {cond_val} allowed={ALLOWED_SELECTS.get(cond_sel)}")
                         except Exception:
                             pass
-
-                        # wait a bit for the server to update the select
+                        df_output.at[i, "resultado"] = f"Valor invalido para condicion: {cond_val}"
+                        break
+                    cond_ok = False
+                    try:
+                        # allow a short wait for dynamic creation
                         try:
-                            esperar_select(page, cond_sel, timeout=1.5 + attempt * 1.5)
+                            page.wait_for_selector(cond_sel, timeout=1500)
                         except Exception:
                             pass
+                        if try_set_select(cond_sel, cond_val):
+                            cond_ok = True
+                    except Exception:
+                        cond_ok = False
 
-                        # refresh cached map for this selector in case options changed
-                        try:
-                            mapping, cnt = build_selector_map(page, cond_sel, normalizar, log_debug)
-                            try:
-                                if cond_sel in selector_cache:
-                                    del selector_cache[cond_sel]
-                            except Exception:
-                                pass
-                            selector_cache[cond_sel] = (mapping, cnt)
-                            try:
-                                inject_selector_map(page, cond_sel, mapping)
-                            except Exception:
-                                pass
-                        except Exception:
-                            pass
-
-                    if not cond_found:
+                    if not cond_ok:
                         df_output.at[i, "resultado"] = f"No existe condicion: {row['condicion']}"
                         break
-                    try:
-                        from services.playwright_service import find_option_value_js, select_option_via_page_map
-                        val = find_option_value_js(page, "#dnn_ctr417_SiceTAC_CONDICIONCARGA", row["condicion"])
-                        if val:
-                            if select_option_via_page_map(page, "#dnn_ctr417_SiceTAC_CONDICIONCARGA", val):
-                                pass
-                            else:
-                                seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_CONDICIONCARGA", row["condicion"], selector_cache, normalizar, log_debug)
-                        else:
-                            seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_CONDICIONCARGA", row["condicion"], selector_cache, normalizar, log_debug)
-                    except Exception:
-                        seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_CONDICIONCARGA", row["condicion"], selector_cache, normalizar, log_debug)
 
                     try:
                         if not wait_for_significant_response(page, timeout_ms=1000):
@@ -276,21 +353,24 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE, job_meta_path=None):
                             pass
                     log_debug(f"row {i}: condicion selected elapsed={time.time()-row_t0:.3f}s")
 
-                    if not option_exists(page, "#dnn_ctr417_SiceTAC_UNIDADTRANSPORTE", row["carroceria"], selector_cache, normalizar, log_debug):
+                    # For 'unidad transporte' (carroceria) set by Excel value/label directly
+                    # validate unidad transporte
+                    unidad_sel = "#dnn_ctr417_SiceTAC_UNIDADTRANSPORTE"
+                    if not allowed_for_selector(unidad_sel, row.get("carroceria")):
+                        try:
+                            log_debug(f"invalid unidad transporte value for row {i}: {row.get('carroceria')} allowed={ALLOWED_SELECTS.get(unidad_sel)}")
+                        except Exception:
+                            pass
+                        df_output.at[i, "resultado"] = f"Valor invalido para unidad transporte: {row.get('carroceria')}"
+                        break
+
+                    try:
+                        if not try_set_select(unidad_sel, row["carroceria"]):
+                            df_output.at[i, "resultado"] = f"No existe unidad transporte (carroceria): {row['carroceria']}"
+                            break
+                    except Exception:
                         df_output.at[i, "resultado"] = f"No existe unidad transporte (carroceria): {row['carroceria']}"
                         break
-                    try:
-                        from services.playwright_service import find_option_value_js, select_option_via_page_map
-                        val = find_option_value_js(page, "#dnn_ctr417_SiceTAC_UNIDADTRANSPORTE", row["carroceria"])
-                        if val:
-                            if select_option_via_page_map(page, "#dnn_ctr417_SiceTAC_UNIDADTRANSPORTE", val):
-                                pass
-                            else:
-                                seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_UNIDADTRANSPORTE", row["carroceria"], selector_cache, normalizar, log_debug)
-                        else:
-                            seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_UNIDADTRANSPORTE", row["carroceria"], selector_cache, normalizar, log_debug)
-                    except Exception:
-                        seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_UNIDADTRANSPORTE", row["carroceria"], selector_cache, normalizar, log_debug)
 
                     try:
                         if not wait_for_significant_response(page, timeout_ms=1000):
@@ -306,21 +386,23 @@ def procesar_excel(INPUT_FILE, OUTPUT_FILE, job_meta_path=None):
 
 
                     if condicion != "vacio" and pd.notna(row["tipo_carga"]):
-                        if not option_exists(page, "#dnn_ctr417_SiceTAC_TIPOCARGA", row["tipo_carga"], selector_cache, normalizar, log_debug):
+                        tipo_sel = "#dnn_ctr417_SiceTAC_TIPOCARGA"
+                        # validate tipo carga
+                        if not allowed_for_selector(tipo_sel, row.get("tipo_carga")):
+                            try:
+                                log_debug(f"invalid tipo_carga value for row {i}: {row.get('tipo_carga')} allowed={ALLOWED_SELECTS.get(tipo_sel)}")
+                            except Exception:
+                                pass
+                            df_output.at[i, "resultado"] = f"Valor invalido para tipo_carga: {row.get('tipo_carga')}"
+                            break
+
+                        try:
+                            if not try_set_select(tipo_sel, row["tipo_carga"]):
+                                df_output.at[i, "resultado"] = f"No existe tipo_carga: {row['tipo_carga']}"
+                                break
+                        except Exception:
                             df_output.at[i, "resultado"] = f"No existe tipo_carga: {row['tipo_carga']}"
                             break
-                        try:
-                            from services.playwright_service import find_option_value_js, select_option_via_page_map
-                            val = find_option_value_js(page, "#dnn_ctr417_SiceTAC_TIPOCARGA", row["tipo_carga"])
-                            if val:
-                                if select_option_via_page_map(page, "#dnn_ctr417_SiceTAC_TIPOCARGA", val):
-                                    pass
-                                else:
-                                    seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_TIPOCARGA", row["tipo_carga"], selector_cache, normalizar, log_debug)
-                            else:
-                                seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_TIPOCARGA", row["tipo_carga"], selector_cache, normalizar, log_debug)
-                        except Exception:
-                            seleccionar_opcion(page, "#dnn_ctr417_SiceTAC_TIPOCARGA", row["tipo_carga"], selector_cache, normalizar, log_debug)
 
                     if not option_exists(page, "#dnn_ctr417_SiceTAC_ORIGEN", row["origen"], selector_cache, normalizar, log_debug):
                         df_output.at[i, "resultado"] = f"No existe origen: {row['origen']}"
