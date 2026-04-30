@@ -63,48 +63,76 @@ function App() {
     const formData = new FormData();
     formData.append("file", file);
 
-    setStatus("Procesando... esto puede tardar");
+    setStatus("Encolando y procesando...");
     setIsProcessing(true);
 
     try {
-      const response = await fetch(`${API_URL}/procesar`, {
+      // Use async enqueue so we can show per-row progress
+      const response = await fetch(`${API_URL}/enqueue`, {
         method: "POST",
         body: formData,
       });
 
       if (!response.ok) {
-        throw new Error("Error en el servidor");
+        const errText = await response.text().catch(() => null);
+        throw new Error(errText || "Error en el servidor");
       }
 
-      // Try to read an optional header with number of processed rows
-      const headerRows = response.headers.get('X-Rows-Processed');
-      const headerErrors = response.headers.get('X-Rows-Errors');
-      const headerStatus = response.headers.get('X-Processing-Status');
+      const data = await response.json();
+      const statusUrl = `${API_URL}${data.status_url}`;
+      const downloadEndpoint = `${API_URL}${data.download_url}`;
 
-      setRowsProcessed(headerRows ? Number(headerRows) : null);
-      setRowsErrors(headerErrors ? Number(headerErrors) : null);
-      setProcessingStatus(headerStatus || null);
+      // Poll status until finished/error
+      const poll = async () => {
+        try {
+          const s = await fetch(statusUrl);
+          if (!s.ok) throw new Error('Status fetch failed');
+          const meta = await s.json();
 
-      const blob = await response.blob();
+          setRowsProcessed(meta.rows_processed ?? null);
+          setRowsErrors(meta.rows_errors ?? null);
+          // show processing status only while queued/running
+          if (meta.status === 'queued' || meta.status === 'running') {
+            setProcessingStatus(meta.status);
+          } else {
+            setProcessingStatus(null);
+          }
 
-      // create object URL and store it so user must click download
-      if (downloadUrl) {
-        try { window.URL.revokeObjectURL(downloadUrl); } catch(e){}
-      }
-      const url = window.URL.createObjectURL(blob);
-      setDownloadUrl(url);
+          if (meta.status === 'queued' || meta.status === 'running') {
+            const current = (meta.rows_processed || 0) + 1;
+            if (meta.total_rows) {
+              setStatus(`Procesando fila ${current} de ${meta.total_rows}`);
+            } else {
+              setStatus(`Procesando fila ${current}`);
+            }
+            setTimeout(poll, 2000);
+            return;
+          }
 
-      // try to read filename from headers
-      const cd = response.headers.get('Content-Disposition');
-      if (cd) {
-        const match = /filename\*=UTF-8''([^;\n]+)/i.exec(cd) || /filename="?([^";\n]+)"?/i.exec(cd);
-        if (match) setDownloadName(decodeURIComponent(match[1]));
-      }
+          if (meta.status === 'finished') {
+            setStatus('Archivo listo — pulsa Descargar');
+            setDownloadUrl(downloadEndpoint);
+            setIsProcessing(false);
+            setProcessingStatus(null);
+            return;
+          }
 
-      setStatus("Archivo listo — pulsa Descargar");
+          if (meta.status === 'error') {
+            setStatus('Error: ' + (meta.error || 'Procesamiento falló'));
+            setIsProcessing(false);
+            setProcessingStatus(null);
+            return;
+          }
+        } catch (err) {
+          setStatus('Error consultando estado: ' + (err.message || err));
+          setIsProcessing(false);
+        }
+      };
+
+      poll();
+
     } catch (error) {
       setStatus("Error: " + error.message);
-    } finally {
       setIsProcessing(false);
     }
   };

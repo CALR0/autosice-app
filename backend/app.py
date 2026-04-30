@@ -243,7 +243,16 @@ def procesar():
         except Exception:
             pass
 
-        meta = {"status": "queued", "created_at": time.time()}
+        # attempt to detect total rows for progress reporting
+        total_rows = None
+        try:
+            import pandas as pd
+            df = pd.read_excel(str(inp))
+            total_rows = int(df.shape[0])
+        except Exception:
+            total_rows = None
+
+        meta = {"status": "queued", "created_at": time.time(), "total_rows": total_rows, "rows_processed": 0, "rows_errors": 0}
         save_job_meta(job_id, meta)
 
         t = threading.Thread(target=_process_job_async, args=(job_id,), daemon=True)
